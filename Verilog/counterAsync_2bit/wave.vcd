@@ -1,0 +1,275 @@
+$date
+	Wed Oct 08 21:24:50 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module counterAsync_2bit_tb $end
+$var wire 1 ! Q1 $end
+$var wire 1 " Q0 $end
+$var reg 1 # clk $end
+$var reg 1 $ clrn $end
+$scope module counter $end
+$var wire 1 # clk $end
+$var wire 1 $ clrn $end
+$var wire 1 ! Q1 $end
+$var wire 1 " Q0 $end
+$scope module jk1 $end
+$var wire 1 % a $end
+$var wire 1 & b $end
+$var wire 1 ' c $end
+$var wire 1 ( cbar $end
+$var wire 1 # clk $end
+$var wire 1 $ clrn $end
+$var wire 1 ) d $end
+$var wire 1 * j $end
+$var wire 1 + k $end
+$var wire 1 " q $end
+$var wire 1 , qbar $end
+$var wire 1 - y $end
+$var wire 1 . ybar $end
+$upscope $end
+$scope module jk2 $end
+$var wire 1 / a $end
+$var wire 1 0 b $end
+$var wire 1 1 c $end
+$var wire 1 2 cbar $end
+$var wire 1 " clk $end
+$var wire 1 $ clrn $end
+$var wire 1 3 d $end
+$var wire 1 4 j $end
+$var wire 1 5 k $end
+$var wire 1 ! q $end
+$var wire 1 6 qbar $end
+$var wire 1 7 y $end
+$var wire 1 8 ybar $end
+$upscope $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+$end
+#0
+$dumpvars
+18
+07
+16
+15
+14
+03
+12
+11
+10
+1/
+1.
+0-
+1,
+1+
+1*
+0)
+1(
+1'
+1&
+1%
+0$
+0#
+0"
+0!
+$end
+#2
+1$
+#5
+0.
+1)
+1-
+0(
+0%
+1#
+#10
+08
+13
+17
+0,
+02
+0/
+1"
+0'
+1(
+1%
+0#
+#15
+0-
+1'
+1.
+0(
+0&
+1#
+#20
+06
+1!
+01
+12
+1/
+0"
+1,
+0)
+1(
+1&
+0#
+#25
+0.
+1)
+1-
+0(
+0%
+1#
+#30
+07
+11
+18
+0,
+02
+00
+1"
+0'
+1(
+1%
+0#
+#35
+0-
+1'
+1.
+0(
+0&
+1#
+#40
+0!
+16
+03
+12
+10
+0"
+1,
+0)
+1(
+1&
+0#
+#45
+0.
+1)
+1-
+0(
+0%
+1#
+#50
+08
+13
+17
+0,
+02
+0/
+1"
+0'
+1(
+1%
+0#
+#55
+0-
+1'
+1.
+0(
+0&
+1#
+#60
+06
+1!
+01
+12
+1/
+0"
+1,
+0)
+1(
+1&
+0#
+#65
+0.
+1)
+1-
+0(
+0%
+1#
+#70
+07
+11
+18
+0,
+02
+00
+1"
+0'
+1(
+1%
+0#
+#75
+0-
+1'
+1.
+0(
+0&
+1#
+#80
+0!
+16
+03
+12
+10
+0"
+1,
+0)
+1(
+1&
+0#
+#85
+0.
+1)
+1-
+0(
+0%
+1#
+#90
+08
+13
+17
+0,
+02
+0/
+1"
+0'
+1(
+1%
+0#
+#95
+0-
+1'
+1.
+0(
+0&
+1#
+#100
+06
+1!
+01
+12
+1/
+0"
+1,
+0)
+1(
+1&
+0#
+#102

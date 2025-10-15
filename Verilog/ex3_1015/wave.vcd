@@ -1,0 +1,235 @@
+$date
+	Wed Oct 15 20:30:58 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module tb $end
+$var wire 4 ! Y [3:0] $end
+$var reg 2 " A [1:0] $end
+$var reg 2 # B [1:0] $end
+$var reg 2 $ C [1:0] $end
+$var reg 2 % D [1:0] $end
+$var reg 1 & E $end
+$var reg 1 ' S $end
+$scope module t $end
+$var wire 2 ( A [1:0] $end
+$var wire 2 ) B [1:0] $end
+$var wire 2 * C [1:0] $end
+$var wire 2 + D [1:0] $end
+$var wire 1 & E $end
+$var wire 1 ' S $end
+$var wire 4 , Y [3:0] $end
+$var wire 4 - CD [3:0] $end
+$var wire 4 . AB [3:0] $end
+$scope module m1 $end
+$var wire 2 / A [1:0] $end
+$var wire 2 0 B [1:0] $end
+$var wire 4 1 out [3:0] $end
+$upscope $end
+$scope module m2 $end
+$var wire 2 2 A [1:0] $end
+$var wire 2 3 B [1:0] $end
+$var wire 4 4 out [3:0] $end
+$upscope $end
+$scope module mux $end
+$var wire 4 5 AB [3:0] $end
+$var wire 4 6 CD [3:0] $end
+$var wire 1 & E $end
+$var wire 1 ' S $end
+$var wire 4 7 Y [3:0] $end
+$upscope $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+$end
+#0
+$dumpvars
+b0 7
+b110 6
+b1001 5
+b110 4
+b10 3
+b11 2
+b1001 1
+b11 0
+b11 /
+b1001 .
+b110 -
+b0 ,
+b10 +
+b11 *
+b11 )
+b11 (
+0'
+1&
+b10 %
+b11 $
+b11 #
+b11 "
+b0 !
+$end
+#10
+b0 -
+b0 4
+b0 6
+b0 .
+b0 1
+b0 5
+1'
+b0 $
+b0 *
+b0 2
+b0 "
+b0 (
+b0 /
+#20
+b11 !
+b11 ,
+b11 7
+b10 -
+b10 4
+b10 6
+b11 .
+b11 1
+b11 5
+0'
+0&
+b1 $
+b1 *
+b1 2
+b1 "
+b1 (
+b1 /
+#30
+b100 !
+b100 ,
+b100 7
+b100 -
+b100 4
+b100 6
+b110 .
+b110 1
+b110 5
+1'
+b10 $
+b10 *
+b10 2
+b10 "
+b10 (
+b10 /
+#40
+b110 !
+b110 ,
+b110 7
+b1001 -
+b1001 4
+b1001 6
+0'
+b11 %
+b11 +
+b11 3
+b11 $
+b11 *
+b11 2
+b10 #
+b10 )
+b10 0
+b11 "
+b11 (
+b11 /
+#50
+b0 !
+b0 ,
+b0 7
+b0 .
+b0 1
+b0 5
+b0 -
+b0 4
+b0 6
+1'
+b0 $
+b0 *
+b0 2
+b0 "
+b0 (
+b0 /
+#60
+b10 !
+b10 ,
+b10 7
+b10 .
+b10 1
+b10 5
+b11 -
+b11 4
+b11 6
+0'
+b1 $
+b1 *
+b1 2
+b1 "
+b1 (
+b1 /
+#70
+b110 !
+b110 ,
+b110 7
+b100 .
+b100 1
+b100 5
+b110 -
+b110 4
+b110 6
+1'
+b10 $
+b10 *
+b10 2
+b10 "
+b10 (
+b10 /
+#80
+b11 !
+b11 ,
+b11 7
+b0 -
+b0 4
+b0 6
+b11 .
+b11 1
+b11 5
+0'
+b0 %
+b0 +
+b0 3
+b11 $
+b11 *
+b11 2
+b1 #
+b1 )
+b1 0
+b11 "
+b11 (
+b11 /
+#90
+b0 !
+b0 ,
+b0 7
+b0 .
+b0 1
+b0 5
+1'
+b0 $
+b0 *
+b0 2
+b0 "
+b0 (
+b0 /
+#100
+0'
