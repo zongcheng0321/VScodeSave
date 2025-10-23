@@ -1,0 +1,157 @@
+$date
+	Wed Oct 22 20:38:04 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module tb $end
+$var wire 1 ! status $end
+$var wire 13 " result [12:0] $end
+$var reg 1 # aclk $end
+$var reg 3 $ opcode [2:0] $end
+$var reg 13 % x [12:0] $end
+$var reg 13 & y [12:0] $end
+$scope module alu $end
+$var wire 1 # aclk $end
+$var wire 3 ' opcode [2:0] $end
+$var wire 13 ( x [12:0] $end
+$var wire 13 ) y [12:0] $end
+$var reg 13 * result [12:0] $end
+$var reg 1 ! status $end
+$upscope $end
+$scope begin $ivl_for_loop0 $end
+$var integer 32 + i [31:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+$end
+#0
+$dumpvars
+b0 +
+bx *
+b10 )
+b100 (
+b1 '
+b10 &
+b100 %
+b1 $
+0#
+bx "
+x!
+$end
+#5
+0!
+b110 "
+b110 *
+1#
+#10
+0#
+b10 $
+b10 '
+b1 +
+#15
+b10 "
+b10 *
+1#
+#20
+0#
+b11 $
+b11 '
+b10 +
+#25
+1#
+#30
+0#
+b100 $
+b100 '
+b11 +
+#35
+1!
+b0 "
+b0 *
+1#
+#40
+0#
+b101 $
+b101 '
+b100 +
+#45
+0!
+b1 "
+b1 *
+1#
+#50
+0#
+b110 $
+b110 '
+b101 +
+#55
+b10 "
+b10 *
+1#
+#60
+0#
+b111 $
+b111 '
+b110 +
+#65
+b1000 "
+b1000 *
+1#
+#70
+0#
+b0 $
+b0 '
+b111 +
+#75
+b100 "
+b100 *
+1#
+#80
+0#
+b1000 +
+#85
+1#
+#90
+0#
+#95
+1#
+#100
+0#
+#105
+1#
+#110
+0#
+#115
+1#
+#120
+0#
+#125
+1#
+#130
+0#
+#135
+1#
+#140
+0#
+#145
+1#
+#150
+0#
+#155
+1#
+#160
+0#
+#165
+1#
+#170
+0#
+#175
+1#
+#180
+0#

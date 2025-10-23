@@ -1,5 +1,6 @@
 module ALU_func (
-    output reg result, status,
+    output reg [12:0] result, 
+    output reg status,
     input [12:0] x ,y,
     input [2:0] opcode,
     input aclk
