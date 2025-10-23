@@ -12,7 +12,7 @@ initial begin
         opcode = opcode +1;
         #10;
     end
-    #80 $finish;
+    $finish;
 end
 always #5 aclk = ~aclk;
 initial begin
