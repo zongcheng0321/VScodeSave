@@ -1,11 +1,7 @@
-module Mux_4to1 #(
-    parameter WIDTH = 1
-)(
-    F,s3,s2,s1,s0,A,B
-); 
-output [WIDTH-1:0] F;
+module Mux_4to1(F,s3,s2,s1,s0,A,B); 
+output  F;
 input A,B; // AB為選擇線(A -> MSB)
-input [WIDTH-1:0] s3,s2,s1,s0; // s3~s0為輸入 
+input s3,s2,s1,s0; // s3~s0為輸入 
 wire an,bn,anbn,anB,Abn,AB;
 not a1(an,A);
 not b1(bn,B);
