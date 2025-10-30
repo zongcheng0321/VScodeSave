@@ -4,7 +4,7 @@ reg [2:0] select;
 reg [3:0] a, b;
 F_8_ALU alu (.out(out), .a(a), .b(b), .select(select));
 initial begin
-    a = 4; b =2; select = 7;
+    a = 12; b =12; select = 7;
     for(integer i = 0;i <8;i = i + 1)
     begin
         select = select +1;
