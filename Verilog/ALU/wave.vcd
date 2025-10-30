@@ -1,5 +1,5 @@
 $date
-	Thu Oct 30 15:57:40 2025
+	Thu Oct 30 22:46:40 2025
 $end
 $version
 	Icarus Verilog
@@ -11,17 +11,20 @@ $scope module tb $end
 $var wire 6 ! out [5:0] $end
 $var reg 4 " a [3:0] $end
 $var reg 4 # b [3:0] $end
-$var reg 3 $ select [2:0] $end
+$var reg 4 $ c [3:0] $end
+$var reg 3 % select [2:0] $end
 $scope module alu $end
-$var wire 4 % a [3:0] $end
-$var wire 4 & b [3:0] $end
-$var wire 3 ' select [2:0] $end
-$var reg 6 ( compare1 [5:0] $end
-$var reg 6 ) compare2 [5:0] $end
-$var reg 6 * out [5:0] $end
+$var wire 4 & a [3:0] $end
+$var wire 4 ' b [3:0] $end
+$var wire 4 ( c [3:0] $end
+$var wire 3 ) select [2:0] $end
+$var reg 6 * compare1 [5:0] $end
+$var reg 6 + compare2 [5:0] $end
+$var reg 6 , mid [5:0] $end
+$var reg 6 - out [5:0] $end
 $upscope $end
 $scope begin $ivl_for_loop0 $end
-$var integer 32 + i [31:0] $end
+$var integer 32 . i [31:0] $end
 $upscope $end
 $upscope $end
 $enddefinitions $end
@@ -30,55 +33,62 @@ $dumpall
 $end
 #0
 $dumpvars
-b0 +
-b10000 *
-b1100 )
-b1100 (
-b0 '
-b1100 &
-b1100 %
-b0 $
+b0 .
+b11100 -
+b1101 ,
+b1100 +
+b1110 *
+b0 )
+b1110 (
+b1100 '
+b1101 &
+b0 %
+b1110 $
 b1100 #
-b1100 "
-b10000 !
+b1101 "
+b11100 !
 $end
 #10
-b11000 !
-b11000 *
-b1 $
-b1 '
-b1 +
+b11001 !
+b11001 -
+b1 %
+b1 )
+b1 .
 #20
-b0 !
-b0 *
-b10 $
-b10 '
-b10 +
+b1 !
+b1 -
+b10 %
+b10 )
+b10 .
 #30
-b1101 !
-b1101 *
-b11 $
-b11 '
-b11 +
+b1110 !
+b1110 -
+b11 %
+b11 )
+b11 .
 #40
-b1011 !
-b1011 *
-b100 $
-b100 '
-b100 +
-#50
 b1100 !
-b1100 *
-b101 $
-b101 '
-b101 +
+b1100 -
+b100 %
+b100 )
+b100 .
+#50
+b1110 !
+b1110 -
+b101 %
+b101 )
+b101 .
 #60
-b110 $
-b110 '
-b110 +
+b1100 !
+b1100 -
+b110 %
+b110 )
+b110 .
 #70
-b111 $
-b111 '
-b111 +
+b1101 !
+b1101 -
+b111 %
+b111 )
+b111 .
 #80
-b1000 +
+b1000 .
