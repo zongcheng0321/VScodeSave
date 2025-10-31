@@ -1,7 +1,7 @@
 module tb;
 reg x,y,w,z;
 wire f;
-circuit modulee(.f(f), .x(x), .y(y), .w(w), .z(z));
+circuit2 modulee(.f(f), .x(x), .y(y), .w(w), .z(z));
 initial begin
     for(integer i=0;i<=1;i=i+1)
     begin
@@ -23,7 +23,7 @@ initial begin
     $finish;
 end
 initial begin
-    $dumpfile("wave.vcd");//  iverilog circuit.v tb.v
+    $dumpfile("wave.vcd");//  iverilog circuit2.v tb.v
     $dumpvars(0, tb); // vvp wave
 end
 endmodule
