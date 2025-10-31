@@ -11,7 +11,7 @@ initial begin
     $finish;
 end
 initial begin
-    $dumpfile("wave.vcd"); //  iverilog -o wave Converter.v tb.v
+    $dumpfile("wave.vcd"); //  iverilog -o wave behavior.v tb.v
     $dumpvars(0, tb); // vvp wave
 end
 
