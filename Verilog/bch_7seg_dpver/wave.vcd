@@ -1,5 +1,5 @@
 $date
-	Sun Nov 02 20:39:30 2025
+	Sun Nov 02 21:18:38 2025
 $end
 $version
 	Icarus Verilog
@@ -8,17 +8,74 @@ $timescale
 	1s
 $end
 $scope module bcd_7seg_tb $end
-$var wire 8 ! out [7:0] $end
-$var reg 1 " A $end
-$var reg 1 # B $end
-$var reg 1 $ C $end
-$var reg 1 % D $end
+$var wire 1 ! g $end
+$var wire 1 " f $end
+$var wire 1 # e $end
+$var wire 1 $ dp $end
+$var wire 1 % d $end
+$var wire 1 & c $end
+$var wire 1 ' b $end
+$var wire 1 ( a $end
+$var reg 1 ) A $end
+$var reg 1 * B $end
+$var reg 1 + C $end
+$var reg 1 , D $end
 $scope module BCD $end
-$var wire 1 " A $end
-$var wire 1 # B $end
-$var wire 1 $ C $end
-$var wire 1 % D $end
-$var reg 8 & out [7:0] $end
+$var wire 1 ) A $end
+$var wire 1 * B $end
+$var wire 1 + C $end
+$var wire 1 , D $end
+$var wire 1 ( a $end
+$var wire 1 - ab $end
+$var wire 1 . abdn $end
+$var wire 1 / abn $end
+$var wire 1 0 abncn $end
+$var wire 1 1 abnd $end
+$var wire 1 2 ac $end
+$var wire 1 3 acnd $end
+$var wire 1 4 ad $end
+$var wire 1 5 adn $end
+$var wire 1 6 an $end
+$var wire 1 7 anb $end
+$var wire 1 8 anbcn $end
+$var wire 1 9 anbd $end
+$var wire 1 : anbdn $end
+$var wire 1 ; anbn $end
+$var wire 1 < anc $end
+$var wire 1 = ancd $end
+$var wire 1 > ancdn $end
+$var wire 1 ? ancndn $end
+$var wire 1 @ ao $end
+$var wire 1 ' b $end
+$var wire 1 A bc $end
+$var wire 1 B bcnd $end
+$var wire 1 C bdn $end
+$var wire 1 D bn $end
+$var wire 1 E bnc $end
+$var wire 1 F bncd $end
+$var wire 1 G bncn $end
+$var wire 1 H bncndn $end
+$var wire 1 I bnd $end
+$var wire 1 J bndn $end
+$var wire 1 K bo $end
+$var wire 1 & c $end
+$var wire 1 L cdn $end
+$var wire 1 M cn $end
+$var wire 1 N cnd $end
+$var wire 1 O cndn $end
+$var wire 1 P co $end
+$var wire 1 % d $end
+$var wire 1 Q dn $end
+$var wire 1 R do $end
+$var wire 1 $ dp $end
+$var wire 1 # e $end
+$var wire 1 S eo $end
+$var wire 1 " f $end
+$var wire 1 T fo $end
+$var wire 1 ! g $end
+$var wire 1 U go $end
+$var wire 1 V h $end
+$var wire 1 W ho $end
 $upscope $end
 $upscope $end
 $enddefinitions $end
@@ -27,82 +84,371 @@ $dumpall
 $end
 #0
 $dumpvars
-b11 &
-0%
-0$
-0#
-0"
-b11 !
+zW
+zV
+1U
+0T
+0S
+0R
+1Q
+0P
+1O
+0N
+1M
+0L
+0K
+1J
+0I
+1H
+1G
+0F
+0E
+1D
+0C
+0B
+0A
+0@
+1?
+0>
+0=
+0<
+1;
+0:
+09
+08
+07
+16
+05
+04
+03
+02
+01
+00
+0/
+0.
+0-
+0,
+0+
+0*
+0)
+1(
+1'
+1&
+1%
+1$
+1#
+1"
+0!
 $end
 #10
-b10011111 !
-b10011111 &
-1%
-#20
-b100101 !
-b100101 &
+1R
+1@
+1T
 0%
-1$
-#30
-b1101 !
-b1101 &
-1%
-#40
-b10011001 !
-b10011001 &
-0%
-0$
-1#
-#50
-b1001001 !
-b1001001 &
-1%
-#60
-b1000001 !
-b1000001 &
-0%
-1$
-#70
-b11111 !
-b11111 &
-1%
-#80
-b1 !
-b1 &
-0%
-0$
+0(
+1S
+0"
 0#
-1"
-#90
-b1001 !
-b1001 &
+0?
+0H
+0J
+0O
+0Q
+1N
+1I
+1,
+#20
+0R
 1%
-#100
-b10001 !
-b10001 &
-0%
-1$
-#110
-b11000001 !
-b11000001 &
-1%
-#120
-b1100011 !
-b1100011 &
-0%
-0$
+0S
+1P
+0@
+0U
 1#
-#130
-b10000101 !
-b10000101 &
-1%
-#140
-b1100001 !
-b1100001 &
+0&
+1(
+1!
+1>
+1J
+1L
+0G
+1Q
+0N
+0I
+0M
+1<
+1E
+0,
+1+
+#30
+1S
+0P
+0#
+1&
+0>
+0J
+0L
+0Q
+1=
+1I
+1F
+1,
+#40
+0T
+1"
+1@
+0K
+1R
+0U
+0(
+1'
 0%
-1$
-#150
-b1110001 !
-b1110001 &
+1!
+1C
+1:
+1?
+1O
+18
+0;
+1Q
+0I
+1M
+0<
+0=
+0F
+0E
+0D
+17
+0,
+0+
+1*
+#50
+1K
+0'
+0@
+0R
+1(
 1%
+0?
+0C
+0O
+0:
+0Q
+19
+1N
+1B
+1,
+#60
+0S
+0R
+0U
+1#
+1%
+1!
+1>
+1C
+1L
+1:
+08
+1Q
+09
+0N
+0B
+0M
+1A
+1<
+0,
+1+
+#70
+1R
+1T
+1U
+0%
+0"
+1S
+0!
+0K
+0#
+1'
+0>
+0C
+0L
+0:
+0Q
+19
+1=
+1,
+#80
+0R
+0T
+0U
+1%
+0S
+1"
+1!
+0@
+0P
+1#
+1(
+1&
+15
+1O
+10
+1G
+1H
+1J
+1/
+1Q
+1M
+0<
+0=
+1D
+0A
+09
+07
+06
+0,
+0+
+0*
+1)
+#90
+1S
+0#
+05
+0H
+0J
+0O
+0Q
+13
+1N
+1I
+11
+14
+1,
+#100
+0K
+1R
+1'
+0%
+0S
+15
+1J
+1L
+00
+0G
+1#
+1Q
+03
+0N
+0I
+01
+04
+0M
+12
+1E
+0,
+1+
+#110
+1@
+1K
+0(
+0'
+0R
+1%
+05
+0J
+0L
+0Q
+1I
+11
+1F
+14
+1,
+#120
+0@
+1(
+1P
+0R
+0T
+1U
+0&
+1%
+1"
+0!
+15
+1.
+1C
+1O
+0/
+1Q
+0I
+01
+04
+1M
+0F
+02
+0E
+0D
+1-
+0,
+0+
+1*
+#130
+1@
+1T
+0(
+0"
+0K
+0P
+0U
+1'
+1&
+1!
+05
+0.
+0C
+0O
+0Q
+13
+1N
+14
+1B
+1,
+#140
+1K
+1P
+0R
+0U
+0@
+0T
+0'
+0&
+1%
+1!
+1(
+1"
+15
+1.
+1C
+1L
+1Q
+03
+0N
+04
+0B
+0M
+1A
+12
+0,
+1+
+#150
+1R
+0%
+05
+0.
+0C
+0L
+0Q
+14
+1,
 #160
