@@ -1,0 +1,149 @@
+$date
+	Sun Nov 02 20:10:50 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module bcd_7seg_tb $end
+$var wire 1 ! dp $end
+$var wire 1 " g $end
+$var wire 1 # f $end
+$var wire 1 $ e $end
+$var wire 1 % d $end
+$var wire 1 & c $end
+$var wire 1 ' b $end
+$var wire 1 ( a $end
+$var reg 1 ) A $end
+$var reg 1 * B $end
+$var reg 1 + C $end
+$var reg 1 , D $end
+$scope module BCD $end
+$var wire 1 ) A $end
+$var wire 1 * B $end
+$var wire 1 + C $end
+$var wire 1 , D $end
+$var wire 1 ( a $end
+$var wire 1 ' b $end
+$var wire 1 & c $end
+$var wire 1 % d $end
+$var wire 1 ! dp $end
+$var wire 1 $ e $end
+$var wire 1 # f $end
+$var wire 1 " g $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+$end
+#0
+$dumpvars
+0,
+0+
+0*
+0)
+1(
+1'
+1&
+1%
+1$
+1#
+0"
+0!
+$end
+#10
+0#
+0(
+0%
+0$
+1,
+#20
+1$
+0&
+1(
+1%
+1"
+0,
+1+
+#30
+0$
+1&
+1,
+#40
+0(
+0%
+1#
+1&
+0,
+0+
+1*
+#50
+1(
+0'
+1%
+1,
+#60
+1$
+0'
+0,
+1+
+#70
+0%
+0#
+0$
+1'
+0"
+1,
+#80
+1%
+1#
+1'
+1"
+1$
+0,
+0+
+0*
+1)
+#90
+0$
+1,
+#100
+0%
+1$
+0,
+1+
+#110
+0(
+0'
+1%
+1,
+#120
+0"
+1(
+0&
+1%
+0,
+0+
+1*
+#130
+0(
+1'
+1&
+0#
+1"
+1,
+#140
+1(
+0'
+0&
+1#
+0,
+1+
+#150
+0%
+0'
+1,
+#160
