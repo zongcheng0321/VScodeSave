@@ -1,0 +1,159 @@
+$date
+	Wed Nov 19 19:37:30 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1s
+$end
+$scope module tb $end
+$var wire 1 ! z $end
+$var reg 1 " clk $end
+$var reg 1 # clr $end
+$var reg 1 $ x $end
+$scope module f $end
+$var wire 1 " clk $end
+$var wire 1 # clr $end
+$var wire 1 $ x $end
+$var parameter 3 % S0 $end
+$var parameter 3 & S1 $end
+$var parameter 3 ' S2 $end
+$var parameter 3 ( S3 $end
+$var reg 3 ) next_state [2:0] $end
+$var reg 3 * state [2:0] $end
+$var reg 1 ! z $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$comment Show the parameter values. $end
+$dumpall
+b11 (
+b10 '
+b1 &
+b0 %
+$end
+#0
+$dumpvars
+b0 *
+b1 )
+x$
+1#
+0"
+0!
+$end
+#5
+1"
+#10
+0"
+0$
+0#
+#15
+b1 *
+1"
+#20
+0"
+#25
+1"
+#30
+b10 )
+0"
+1$
+#35
+b11 )
+b10 *
+1"
+#40
+0"
+#45
+b0 )
+b11 *
+1"
+#50
+1!
+b1 )
+0"
+0$
+#55
+0!
+b1 *
+1"
+#60
+0"
+#65
+1"
+#70
+b10 )
+0"
+1$
+#75
+b11 )
+b10 *
+1"
+#80
+0"
+#85
+b0 )
+b11 *
+1"
+#90
+1!
+b1 )
+0"
+0$
+#95
+0!
+b1 *
+1"
+#100
+b10 )
+0"
+1$
+#105
+b11 )
+b10 *
+1"
+#110
+0"
+#115
+b0 )
+b11 *
+1"
+#120
+1!
+b1 )
+0"
+0$
+#125
+0!
+b1 *
+1"
+#130
+0"
+#135
+1"
+#140
+b10 )
+0"
+1$
+#145
+b11 )
+b10 *
+1"
+#150
+0"
+#155
+b0 )
+b11 *
+1"
+#160
+1!
+b1 )
+0"
+0$
+#165
+0!
+b1 *
+1"
+#170
+0"
