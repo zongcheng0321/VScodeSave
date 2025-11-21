@@ -23,7 +23,7 @@ initial begin
     s1 = 4'b0111;
     s0 = 4'b0110;
 
-    #100 $finish;
+    #50 $finish;
 end
 
 initial begin
