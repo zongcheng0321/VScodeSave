@@ -19,7 +19,9 @@ initial begin
     #10 in = 8'd77;
     #10 in = 8'd88;
     #10 in = 8'd99;
-    #100;
+    #10 in = 8'd11;
+    #10 in = 8'd22;
+    #10 in = 8'd33;
     $finish;
 end
 initial begin

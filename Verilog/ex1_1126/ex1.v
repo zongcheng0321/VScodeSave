@@ -37,6 +37,7 @@ always @(posedge clk) begin
         out <= R1;
         R1 <= R2;
         R2 <= R1;
+        R2 <= R2;
         R1 <= in;
     end
 end 
