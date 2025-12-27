@@ -1,0 +1,163 @@
+// 控制單元 大改aldkja;ldkjakdljald;kjaldjalkdjakldja;ldkjk;l上升緣發生的當下是不是Decoder 的輸出還停留在上一個狀態存疑
+// ***在上升緣發生的「當下」，Decoder 的輸出還停留在上一個狀態***
+module decoder (clk1, clk2, fch, rst, opcd, zr, ldir, ldac, mrd, mwr, ldpc, pclk, aclk);
+
+input 	clk1, clk2, rst, zr, fch; //新增 zr -> 實現 SKZ 功能 : 有個重點就是它是檢查已經存在 Accumulator 裡的舊值，而不是檢查
+input	[2:0] opcd;				  //現在正在算的新值，所以它不需要等 ALU 算出新值且存入 ACC (100 -> 011)的時間
+output	ldir, ldac, mrd, mwr, ldpc, pclk, aclk;
+reg 	aclk; //控制 ACC 訊號線
+wire	[2:0] seq;
+reg		[5:0] dout; //修改成 6 條線
+
+assign	ldir	= dout[0]; //IR 致能
+assign	mrd		= dout[1]; //記憶體讀取
+assign	mwr 	= dout[2]; //記憶體寫入
+assign	ldpc	= dout[3]; //載入要執行的指令位置功能
+assign	ldac	= dout[4]; //ACC 致能
+assign	pclk	= dout[5]; //PC 致能
+assign	seq 	= {clk1, clk2, fch};
+
+always@(*) begin
+	if(!rst)
+		dout = 6'b000000;
+	else begin 
+		case (seq)
+			//提取模式 fch = 1
+			//目標：讀取記憶體 (mrd) -> 存入指令暫存器 (ldir)
+			//ldir -> IR module 的 input 、 mrd -> memory module 的 input
+			3'b011 : dout = 6'b000000; // mrd, ldir -> 準備中
+			3'b111 : dout = 6'b000010; // mrd, ldir -> mrd = 1 表示 mdat 有值了(不由 clk 正緣觸發控制)
+			3'b001 : dout = 6'b000011; // mrd, ldir -> 等待正緣處發時間將 mdat 寫入 IR
+			3'b101 : dout = 6'b000011; // mrd, ldir -> 將 001 的 dout 結果執行 -> mdat 寫入 IR
+			//執行模式 fch = 0
+			3'b010 : dout = 6'b000000; // 準備中
+			3'b110 : begin 			   
+				case (opcd)					   // pclk 從 0 -> 1 PC 更新
+					3'b010 : dout = 6'b100010; // ADD : PC + 1 且必須讀入運算需要用的資料，所以必須把記憶體讀取打開
+					3'b011 : dout = 6'b100010; // AND : 同上
+					3'b100 : dout = 6'b100010; // XOR : 同上
+					3'b101 : dout = 6'b100010; // LDA -> 記憶體資料給 ACC : 同上
+					default : dout = 6'b100000;// 如果我只讓 pclk(PC 致能) = 1 -> PC + 1 ，不須把記憶體讀取打開
+				endcase    					   // 000(HLT)、001(SKZ)、110(STO)、111(JMP) 記憶體不須輸出之資料
+
+			end
+			3'b000 : begin // 執行
+				case (opcd)
+					3'b010 : dout = 6'b000010; // ADD : 維持當前狀態 pclk 從 1 -> 0
+					3'b011 : dout = 6'b000010; // AND : 維持當前狀態 pclk 從 1 -> 0
+					3'b100 : dout = 6'b000010; // XOR : 維持當前狀態 pclk 從 1 -> 0
+					3'b101 : dout = 6'b000010; // LDA : 維持當前狀態 pclk 從 1 -> 0
+					3'b110 : dout = 6'b000100; // STO : RAM <- ACC 所以記憶體寫入 mwr = 1 -> 這邊把記憶體寫入打開但必須等到 clk 觸發才動作
+					3'b001 : dout = 6'b000000; // SKZ : ALU 輸出為 0 時，跳過下一行(PC + 1)，因為要達成 pclk 0 -> 1
+											   // 所以必須在這裡把 pclk 設為零，好讓下一個時脈(100)把 pclk 變為 1
+					3'b111 : dout = 6'b001000; // JMP : PC <- adir 載入要執行的指令位置功能致能 ldpc = 1
+					default : dout = 6'b000000;// 在電路啟動之時(rst = 0 -> 1)，尚未進入提取模式，seq = 000
+				endcase						   // 不過因為 opcd = 000 (IR 給的)，所以 dout 全部都是 0 不做任何事
+				end
+			3'b100 : begin // 我要在 seq = 000 -> 100 時把運算結果儲存回 ACC ，因為是由 seq 控制，所以在 aclk 0 -> 1 時，
+						   // 看到的會是 seq = 100 的 dout 結果
+				case (opcd)// 判斷 ALU 的結果(acc_out)，產出 ZR
+					3'b010 : dout = 6'b010010; // ADD : 把運算結果儲存
+					3'b011 : dout = 6'b010010; // ADD : 把運算結果儲存
+					3'b100 : dout = 6'b010010; // XOR : 把運算結果儲存
+					3'b101 : dout = 6'b010010; // LDA : 把運算結果儲存
+					3'b110 : dout = 6'b100100; // STO : 這時 clk 觸發看到 seq = 000 的時候的 dout ，所以執行 RAM <- ACC
+					3'b001 : begin             // SKZ 
+                        if (zr) 
+                        	dout = 6'b100000;  // ZR = 1 -> pclk = 1 (第二個上升緣，PC 再 + 1)
+                        else    
+                            dout = 6'b000000;  // ZR = 0 -> pclk = 0 (不變)
+					end
+					3'b111 : dout = 6'b101000; // JMP : pclk 從 0 -> 1 且 ldpc = 1 執行 PC <- adir
+					default : dout = 6'b000000;// seq 由 000 -> 100，尚未進入提取模式
+				endcase						   // 因為 opcd = 000 (IR 給的)，所以 dout 全部都是 0 不做任何事
+				end
+		endcase
+	end
+end
+// aclk -> ACC 致能
+// aclk 在狀態 100 (Execute 的最後階段)給 0
+// 當狀態離開 100 變成 011 (Fetch Start) 時，aclk 會 0 -> 1 把值存到 ACC
+// 並且在那時 dout 看到的還會是 ldac = 1 (理想)
+always@(*) begin
+	if(!rst)
+		aclk = 0;
+	else begin
+		case (seq)
+			3'b000 : aclk = 0;
+			default : aclk = 1;
+		endcase
+	end
+end
+
+endmodule
+
+`timescale 1ns/1ns
+
+module tb;
+reg clk;
+reg rst;
+reg ewr;
+reg [4:0] ead;
+reg [7:0] edat;
+wire zr;
+
+topmodule u_cpu (.clk(clk), .rst(rst), .ewr(ewr), .ead(ead), .edat(edat), .zr(zr));
+
+// 週期 20ns
+always #10 clk = ~clk;
+
+initial begin
+    clk = 0;
+    rst = 0; // 一開始先 Reset
+    ewr = 0;
+    ead = 0;
+    edat = 0;
+    
+    // 我們要在 CPU 啟動前，偷把指令寫進 RAM
+    // 假設我們要跑： 
+    // 00: LDA 5 (Op:101, Addr:05) -> 10100101 -> 0xA5
+    // 01: ADD 6 (Op:010, Addr:06) -> 01000110 -> 0x46
+    // 02: STO 7 (Op:110, Addr:07) -> 11000111 -> 0xC7
+    // 03: HLT   (Op:000, Addr:00) -> 00000000 -> 0x00
+    // ... 資料區 ...
+    // 05: Data = 10
+    // 06: Data = 20
+    // 07: Result (預期是 30)
+
+    #20; // 等一下
+    
+    // 寫入指令 00: LDA 5
+    ewr = 1; ead = 5'd0; edat = 8'hA5; #20; 
+    
+    // 寫入指令 01: ADD 6
+    ewr = 1; ead = 5'd1; edat = 8'h46; #20; 
+    
+    // 寫入指令 02: STO 7
+    ewr = 1; ead = 5'd2; edat = 8'hC7; #20; 
+    
+    // 寫入資料 05: 10
+    ewr = 1; ead = 5'd5; edat = 8'd10; #20;
+    
+    // 寫入資料 06: 20
+    ewr = 1; ead = 5'd6; edat = 8'd20; #20;
+    
+    // 結束燒錄
+    ewr = 0; 
+    
+    // --- Step 2: 啟動 CPU ---
+    #20;
+    rst = 1; // 放開 Reset，CPU 開始跑！
+    
+    // --- Step 3: 觀察波形 ---
+    // 讓它跑個 1000ns
+    #1000;
+    $stop;
+end
+
+initial begin
+    $dumpfile("wave.vcd"); //  iverilog -o wave topmodule.v tb.v
+    $dumpvars(0, tb); // vvp wave
+end
+
+endmodule
