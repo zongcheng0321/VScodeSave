@@ -1,0 +1,399 @@
+---
+
+### 核心觀念：為什麼需要除彈跳？
+
+機械開關在接觸瞬間會產生物理震動，導致訊號在 0 與 1 之間快速來回切換（通常持續 10ms - 20ms）。對於運作在 MHz 甚至 GHz 等級的 FPGA 來說，這短短的 20ms 等同於成千上萬個時脈週期，會被誤判為多次觸發。
+
+---
+
+### 第一類：FPGA/ASIC 數位邏輯除彈跳法（重點）
+
+在 FPGA 內部，我們無法使用電容，因此必須利用 **「時脈（Clock）」** 與 **「記憶單元（Flip-Flops）」** 來過濾雜訊。
+
+#### 1. 移位暫存器採樣法 (Shift Register Sampling)
+
+**原理：** 將輸入訊號連續存入 N 個串接的 D-Flip Flop (DFF)。只有當所有 DFF 的輸出都一致（全為 1 或全為 0）時，才改變最終輸出。
+**關鍵技巧：** 為了節省 DFF，通常不會用 System Clock 直接推，而是產生一個「慢速 Enable 訊號」（例如 100Hz）來做採樣。
+
+* **電路大小 (Area)：** **小**。只需要 N 個 bit 的暫存器與及閘 (AND Gate)。
+* **速度 (Latency)：** **中等**。延遲時間 = 。
+* **實用性：** **高**。適合雜訊較短的環境。
+* **方便性：** **極高**。Verilog 寫法非常簡單 (e.g., `&shift_reg`).
+* **限制條件：** 如果彈跳時間長，需要的 Shift Register 就會變得很長，浪費資源。必須配合除頻或是 Enable 訊號使用。
+
+// 移位暫存器法： 誤差取決於 Sampling Tick。
+// 延遲時間：15ms ~ 20ms (誤差大)。
+
+#### 2. 計數器確認法 (Counter-based / Integration) - **最推薦**
+
+**原理：** 當輸入訊號發生變化時，啟動計數器。如果輸入訊號在計數過程中又變了（代表是雜訊），則重置計數器。只有當輸入訊號穩定維持到計數器數滿（例如 20ms），才更新輸出結果。
+
+* **電路大小 (Area)：** **中**。需要一個加法器與比較器。位元寬度取決於 Clock 頻率與目標延遲時間（）。
+* **速度 (Latency)：** **慢 (可控)**。延遲時間即為設定的過濾時間，無法避免。
+* **實用性：** **最高**。這是工業級標準做法，抗干擾能力最強。
+* **方便性：** **中**。需要編寫計數邏輯與重置邏輯。
+* **限制條件：** 佔用較多 LUT (Look-Up Table) 資源，尤其是當時脈頻率很高時（例如 100MHz clock 要數 20ms，需要 21-bit counter）。
+
+// 計數器法： 它是用 50MHz 的 System Clock 去數。誤差只有 1 個 Clock Cycle (20ns)。
+// 延遲時間：20.00000ms ~ 20.00002ms (極度精確)。
+
+#### 3. 狀態機法 (FSM Debouncer)
+
+**原理：** 設計一個狀態機：`IDLE` -> `WAIT_STABLE` -> `DETECTED`。利用狀態轉換結合計數器來判斷訊號。
+
+* **電路大小 (Area)：** **中偏大**。除了計數器外，還需要額外的狀態暫存器與解碼邏輯。
+* **速度 (Latency)：** **慢**。同計數器法。
+* **實用性：** **中**。除非有複雜的按鍵邏輯（如長按、雙擊），否則單純除彈跳用 FSM 有點殺雞焉用牛刀。
+* **方便性：** **低**。程式碼較冗長。
+* **限制條件：** 維護較複雜。
+
+---
+
+### 第二類：MPU (Microprocessor) 軟體除彈跳法
+
+MPU 的資源是「運算時間」而非「邏輯閘」，因此策略不同。
+
+#### 1. 延遲等待法 (Blocking Delay)
+
+**原理：** 偵測到邊緣觸發 -> 軟體 `delay_ms(20)` -> 再次讀取 GPIO。如果還是 High，則確認有效。
+
+* **電路大小：** **無** (純軟體)。
+* **速度：** **極差**。CPU 在那 20ms 內什麼都不能做（Blocking）。
+* **實用性：** **低**。只適合簡單的練習專題，不適合多工系統。
+* **方便性：** **高**。寫兩行 code 即可。
+* **限制條件：** 嚴重影響系統即時性 (Real-time performance)。
+
+#### 2. 計時器中斷法 (Timer Interrupt / Polling)
+
+**原理：** 設定一個 10ms 或 20ms 的 Timer 中斷（Tick）。每次中斷進來時檢查 GPIO 狀態，並用變數計數。連續 N 次狀態相同才認定有效。
+
+* **電路大小：** **無**。
+* **速度：** **快**。不會卡住 CPU 主程式。
+* **實用性：** **高**。嵌入式系統標準做法（如 Linux input driver 或 RTOS）。
+* **方便性：** **中**。需設定 Timer ISR。
+* **限制條件：** 佔用一個硬體 Timer 資源，且中斷過於頻繁會增加 CPU 負載。
+
+---
+
+### 第三類：外部類比電路法 (External Hardware)
+
+雖然這是數位設計議題，但在系統層級（PCB Level），有時為了節省 FPGA/MPU 資源，會使用外部電路。
+
+#### 1. RC 低通濾波 + 施密特觸發器 (Schmitt Trigger)
+
+**原理：** 利用電阻電容充放電平滑波形，再透過施密特觸發器的「遲滯現象 (Hysteresis)」將類比電壓轉回漂亮的數位方波。
+
+* **電路大小：** **大 (PCB面積)**。需要外部元件 (R, C, 7414 IC)。
+* **速度：** **快**。硬體反應即時，延遲僅取決於 RC 時間常數。
+* **實用性：** **中**。適合 Pin 腳極少且 MCU/FPGA 資源極度緊繃的狀況。
+* **方便性：** **低**。需要焊接元件，且 R/C 值選錯會導致反應遲鈍。
+* **限制條件：** 增加 BOM Cost (物料成本) 與 PCB 面積。
+
+#### 2. SR Latch (SR 閂鎖器)
+
+**原理：** 使用 SPDT (單刀雙擲) 開關。利用 SR Latch 的記憶特性，開關只要碰到其中一個接點，狀態就會鎖住，完全物理免疫彈跳。
+
+* **實用性：** **極低**。因為 SPDT 開關很貴且體積大，且需要佔用 2 根 I/O Pin。通常只用於實驗室或航太等極高可靠度需求。
+
+---
+
+### 綜合比較總結表 (以 IC 設計觀點)
+
+| 方法 | 電路大小 (Resource) | 反應速度 (Latency) | 實用性 (Robustness) | 方便性 (Coding) | 限制條件 | 適用場景 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Shift Register (FPGA)** | ⭐⭐⭐⭐⭐ (極小) | ⭐⭐⭐ (中) | ⭐⭐⭐ (中) | ⭐⭐⭐⭐⭐ (極高) | 需搭配慢速 Enable | 資源受限、雜訊單純時 |
+| **Counter (FPGA)** | ⭐⭐⭐ (中) | ⭐⭐ (固定延遲) | ⭐⭐⭐⭐⭐ (極高) | ⭐⭐⭐ (中) | 計數器位元寬度隨頻率增加 | **最推薦的通用標準** |
+| **FSM (FPGA)** | ⭐⭐ (較大) | ⭐⭐ (固定延遲) | ⭐⭐⭐⭐ (高) | ⭐⭐ (較繁瑣) | 邏輯較複雜 | 需偵測長按、連點功能時 |
+| **軟體 Polling (MPU)** | N/A | ⭐⭐⭐⭐ (快) | ⭐⭐⭐⭐ (高) | ⭐⭐⭐ (中) | 消耗 CPU 算力 | MCU / 嵌入式系統 |
+| **外部 RC 電路** | N/A (佔 PCB) | ⭐⭐⭐⭐ (快) | ⭐⭐⭐ (中) | ⭐ (需改硬體) | 增加 BOM Cost | 數位資源不足時 |
+
+### 專家建議 (Conclusion)
+
+針對您的 **FPGA IC 設計** 方向，我給出的具體建議如下：
+
+1. **首選方案：計數器確認法 (Counter-based)**
+* **理由：** 這是最穩健的方法。你可以精確控制 Debounce 時間（例如固定 20ms）。在 FPGA 中，建議先對輸入訊號做 **2-stage D-Flip Flop Synchronization (同步化)** 以避免亞穩態 (Metastability)，然後再接計數器除彈跳邏輯。
+* **實作提示：** 不要直接用 System Clock (e.g., 50MHz) 去數 20ms，這樣計數器會太大。先做一個 Pulse Generator 產生 1kHz 的脈衝 (Tick)，用這個 Tick 去驅動 4~5 bits 的計數器，這樣最省面積。
+
+
+2. **若資源極度受限：Shift Register**
+* **理由：** 如果 CPLD 或 FPGA 邏輯閘已經快滿了，Shift Register 配合 Clock Enable 是最省 LUT 的做法。
+
+
+3. **絕對避免：**
+* 不要在 FPGA 內部使用 `Gated Clock` (用按鈕當 Clock) 來除彈跳，這會導致嚴重的 Timing Violation。
+* 不要依賴外部 RC 電路就把訊號直接餵給 FPGA 邏輯，務必在 FPGA 入口處加上同步器 (Synchronizer)。
+
+
+針對 **50MHz** 的系統時脈，我們通常設定除彈跳的目標穩定時間為 **10ms ~ 20ms**。
+---
+
+### 1. 移位暫存器採樣法 (Shift Register Sampling)
+
+**核心策略：**
+直接用 50MHz 去推移位暫存器是不切實際的（因為要存 20ms 的資料需要 1,000,000 個 bit 的暫存器，極度浪費）。
+**解法：** 我們先產生一個 **「慢速脈衝 (Sampling Tick)」**（例如每 5ms 一次），再用這個脈衝去驅動一個短的移位暫存器（例如 4 bits）。
+
+**參數計算：**
+
+* 系統時脈：50MHz (20ns/cycle)
+* 目標採樣頻率：每 5ms 採樣一次 (200Hz)
+* 分頻計數器值：
+* 移位暫存器長度：4 bits (總確認時間 = 4 × 5ms = 20ms)
+
+**Verilog 代碼：**
+
+```verilog
+module debounce_shift_reg (
+    input wire clk,       // 50MHz System Clock
+    input wire rst_n,     // Active Low Reset
+    input wire btn_in,    // Noisy Button Input
+    output reg btn_out    // Debounced Output
+);
+
+    // 1. 參數定義
+    // 5ms at 50MHz = 250,000 cycles
+    parameter TICK_MAX = 250_000 - 1; 
+    
+    reg [17:0] tick_cnt;
+    reg sample_tick;
+    reg [3:0] shift_reg;
+
+    // 2. 慢速脈衝產生器 (Tick Generator)
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            tick_cnt <= 0;
+            sample_tick <= 0;
+        end else begin
+            if (tick_cnt >= TICK_MAX) begin
+                tick_cnt <= 0;
+                sample_tick <= 1'b1; // 產生一個 Cycle 的脈衝
+            end else begin
+                tick_cnt <= tick_cnt + 1;
+                sample_tick <= 1'b0;
+            end
+        end
+    end
+
+    // 3. 移位暫存器邏輯
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            shift_reg <= 4'b0000;
+            btn_out <= 0;
+        end else if (sample_tick) begin
+            // 每次 Tick 發生時，將輸入訊號推入暫存器 (LSB in)
+            shift_reg <= {shift_reg[2:0], btn_in};
+            
+            // 4. 判斷邏輯 (全 1 或 全 0 才改變輸出)
+            if (shift_reg == 4'b1111)
+                btn_out <= 1'b1;
+            else if (shift_reg == 4'b0000)
+                btn_out <= 1'b0;
+            // 若是 0011, 1010 等中間狀態，保持 btn_out 原值不變
+        end
+    end
+
+endmodule
+
+```
+
+**優點：** 邏輯非常簡單，抗雜訊能力取決於採樣頻率。
+**缺點：** 反應速度較慢（因為必須等 4 個 Tick 才能確認狀態）。
+
+---
+
+### 2. 計數器確認法 (Counter-based / Integration)
+
+**核心策略：**
+這是工業界最標準的做法。當輸入訊號與目前的輸出狀態 **不一致** 時，開始計數。如果計數器數滿了（代表訊號穩定了 20ms），就更新輸出。如果中途訊號跳掉，計數器直接歸零重數。
+
+**重要步驟 - 同步化 (Synchronization)：**
+在進入計數邏輯前，**必須**先將外部非同步訊號 (`btn_in`) 通過兩級 D-Flip Flop，避免亞穩態 (Metastability) 導致電路誤動作。
+
+**參數計算：**
+
+* 系統時脈：50MHz
+* 目標穩定時間：20ms
+* 計數器最大值：
+* 計數器位元寬度：，取 20 bits。
+
+**Verilog 代碼：**
+
+```verilog
+module debounce_counter (
+    input wire clk,       // 50MHz System Clock
+    input wire rst_n,     // Active Low Reset
+    input wire btn_in,    // Noisy Button Input
+    output reg btn_out    // Debounced Output
+);
+
+    // 1. 參數定義
+    // 20ms at 50MHz = 1,000,000 cycles
+    parameter DEBOUNCE_TIME = 1_000_000 - 1;
+    
+    reg [19:0] cnt;
+    reg [1:0] btn_sync;   // 用於同步化的暫存器
+
+    // 2. 輸入訊號同步化 (2-stage Synchronizer)
+    // 這是 FPGA 設計的黃金準則，防止亞穩態
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            btn_sync <= 2'b00;
+        end else begin
+            btn_sync <= {btn_sync[0], btn_in};
+        end
+    end
+
+    // wire btn_stable = btn_sync[1]; // 取同步後的訊號
+
+    // 3. 計數器與狀態更新邏輯
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cnt <= 0;
+            btn_out <= 0;
+        end else begin
+            // 如果同步後的輸入訊號 != 目前輸出狀態
+            if (btn_sync[1] != btn_out) begin
+                // 開始計數
+                if (cnt < DEBOUNCE_TIME) begin
+                    cnt <= cnt + 1;
+                end else begin
+                    // 計數完成，確認訊號穩定，更新輸出
+                    btn_out <= btn_sync[1];
+                    cnt <= 0; // 計數器歸零，準備下一次變化
+                end
+            end else begin
+                // 如果輸入訊號跳回原值（代表剛剛是雜訊），計數器馬上清零
+                cnt <= 0;
+            end
+        end
+    end
+
+endmodule
+
+```
+
+**優點：**
+
+1. **穩健性最強**：任何短於 20ms 的雜訊都會被直接濾掉（Counter 會被 reset）。
+2. **精確控制**：可以透過修改 `DEBOUNCE_TIME` 精準設定過濾時間。
+
+**缺點：**
+
+1. **面積稍大**：用到 20-bit 的計數器與比較器（但在現代 FPGA 裡這點資源微乎其微）。
+
+### 設計建議總結
+
+1. **對於 50MHz 的 FPGA**：建議直接使用 **方法 2 (計數器確認法)**。現代 FPGA (如 Altera Cyclone 或 Xilinx Artix/Spartan) 的 LUT 資源非常豐富，一個 20-bit counter 佔用的資源不到 1%，但換來的穩定性是最高的。
+2. **關於同步器**：請注意方法 2 中的 `btn_sync` 部分。直接把外部 pin 腳接進內部的 `if` 判斷是非常危險的，務必加上那兩行同步程式碼。
+3. **參數調整**：若按鍵反應覺得太遲鈍，可以將 `DEBOUNCE_TIME` 設為 `500_000` (10ms)。若是在工廠等高雜訊環境，保持 `1_000_000` (20ms) 較保險。
+
+
+
+採樣誤差 (Sampling Uncertainty)
+---
+
+### 1. 時間精確度比較 (Timing Precision)
+
+回顧我們的 FSM 設計，它是直接使用 **50MHz System Clock** 來驅動的，而不是慢速的 Sampling Tick。
+
+* **觸發機制：** FSM 在 `S_ZERO` 狀態時，只要 `btn_sync` 一變為 `1` (經過 2 個 clock 同步後)，**下一個 50MHz clock cycle** 就會立刻跳到 `S_CHECK_RISING` 並開始計數。
+* **延遲計算：**
+* 同步器延遲：2 個 clock cycles (40ns)。
+* 狀態轉換偵測：1 個 clock cycle (20ns)。
+* 計數時間：設定的 `CNT_MAX` (20ms)。
+
+
+* **總延遲誤差：** 只有 **3~4 個 Clock Cycle (約 60ns - 80ns)**。
+
+**比較表：**
+
+| 特性 | 移位暫存器法 (Shift Reg) | FSM 法 (State Machine) | 計數器法 (Counter-based) |
+| --- | --- | --- | --- |
+| **時基** | 慢速 Tick (e.g., 5ms) | 高速 System Clock (e.g., 20ns) | 高速 System Clock (e.g., 20ns) |
+| **觸發延遲** | 隨機 (0ms ~ 5ms) | 固定 (約 60ns) | 固定 (約 40ns) |
+| **總延遲時間** | **15ms ~ 20ms (浮動)** | **20.00006ms (極精確)** | **20.00004ms (極精確)** |
+| **精確度評價** | ⭐⭐ (有誤差) | ⭐⭐⭐⭐⭐ (精確) | ⭐⭐⭐⭐⭐ (精確) |
+
+**結論：** FSM 法在時間控制上是完美的，與計數器法同級。
+
+---
+
+### 2. 邏輯行為比較 (Logic Behavior)
+
+雖然 FSM 和計數器法都很準，但它們處理「雜訊」的邏輯思維不同。
+
+#### **情境：按鈕按下 5ms 後抖動 (變成 0)，然後又變回 1**
+
+* **計數器法 (Counter-based)**：
+* 邏輯：`if (input != output) count++ else count = 0`
+* 行為：看到 0 的瞬間，計數器直接 **歸零 (Reset)**。等訊號變回 1，計數器從 0 開始重新數 20ms。
+* **結果：** 只要有雜訊，時間就重算。嚴格把關。
+
+
+* **FSM 法**：
+* 邏輯：在 `S_CHECK_RISING` 狀態，`if (input == 0) state = S_ZERO`
+* 行為：看到 0 的瞬間，狀態機 **退回原點 (S_ZERO)**，計數器也隨之歸零。等訊號變回 1，重新進入 `S_CHECK_RISING` 重數 20ms。
+* **結果：** 行為與計數器法完全一致。
+
+
+
+**小結：** 在單純除彈跳的功能上，FSM 與計數器法的行為是 **等價的 (Equivalent)**。
+
+---
+
+### 3. 資源與擴充性比較 (Resource & Scalability) - **決勝點**
+
+既然 FSM 和計數器法都很準，行為也一樣，那為什麼還要分兩種寫法？差別在於 **「未來的擴充性」**。
+
+#### **A. 計數器法 (Counter-based)**
+
+* **優點：** 程式碼最精簡，邏輯閘最少。
+* **缺點：** 邏輯是「寫死」的。
+* **瓶頸：** 如果 PM 突然說：「我們要加一個功能，按住按鈕 3 秒後 LED 要閃爍，但 3 秒內放開算是普通點擊。」
+* 這時候計數器法會變得很難寫，你必須加很多 `if-else` 旗標 (Flags) 來紀錄「現在是不是已經按過了」、「有沒有超過 3 秒」。程式碼會變成「義大利麵條 (Spaghetti Code)」。
+
+
+
+#### **B. FSM 法**
+
+* **優點：** 結構化，狀態明確。
+* **優勢：** 面對複雜需求時，無敵強大。
+* **解法 (針對上述 3 秒長按需求)：**
+1. 你只需要從 `S_ONE` (確認按下) 拉一條線出去。
+2. 新增一個狀態 `S_WAIT_LONG_PRESS`。
+3. 在這個狀態計數 3 秒。
+4. 時間到 -> 跳去 `S_ACTION_LONG`。
+5. 時間沒到就放開 -> 跳去 `S_ACTION_CLICK`。
+
+
+
+**比較總表：**
+
+| 特性 | FSM 法 | 計數器法 | 移位暫存器法 |
+| --- | --- | --- | --- |
+| **程式複雜度** | 高 (需定義狀態) | 低 (直接寫邏輯) | 極低 (最簡單) |
+| **硬體資源 (LUTs)** | 中 (State Logic + Counter) | 低 (Only Counter) | 極低 (Only Shift Reg) |
+| **除彈跳品質** | **完美** | **完美** | **普通** |
+| **抗雜訊能力** | 極佳 | 極佳 | 視採樣率而定 |
+| **擴充長按/連點** | **極容易 (加狀態即可)** | 困難 (需加很多 Flag) | 不可能 |
+
+---
+
+### 最終建議：該選哪一個？
+
+針對您的 IC 設計 / FPGA 方向，請依照 **「功能需求」** 來選：
+
+1. **情境一：單純的 Reset 鍵、開關機鍵**
+* **選擇：** **計數器法 (Counter-based)**。
+* **理由：** 殺雞焉用牛刀。你只需要確認它「按下了沒」，不需要複雜的狀態跳轉。這是最省資源且專業的寫法。
+
+
+2. **情境二：多功能操作鍵 (滑鼠左鍵、手機音量鍵)**
+* **選擇：** **FSM 法**。
+* **理由：** 這類按鍵通常包含「單擊」、「雙擊」、「長按」等多種邏輯。用 FSM 寫，你的程式碼會非常漂亮、易讀，且除錯容易。
+
+
+3. **情境三：資源極度受限的 CPLD 或超低功耗應用**
+* **選擇：** **移位暫存器法**。
+* **理由：** 如果你連一個 20-bit 的計數器都覺得奢侈，那 4-bit 的移位暫存器是你唯一的救贖。但要接受那 5ms 的時間誤差。
