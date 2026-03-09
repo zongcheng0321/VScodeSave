@@ -7,7 +7,7 @@ module debounce_counter (
     // 50Mhz -> T = 20ns. We need 20ms to debounce. So clk needs 20ms/20ns = 1M cycle.
     parameter DEBOUNCE_TIME = 1_000_000 - 1;
     
-    reg [19:0] cnt;       // count
+    reg [19:0] cnt;       // count(1M need 20 bits)
     reg [1:0] btn_sync;   // 同步後的 button signal
 
     // double flop sync 
@@ -17,7 +17,7 @@ module debounce_counter (
             btn_sync <= 2'b00;
         end else begin
             btn_sync <= {btn_sync[0], ~btn_in};
-            // 讓同步後的訊號是正邏輯 (如果按鈕按下是 0 的話)
+            // 讓同步後的訊號是正邏輯 (如果按鈕按下是 0 的話) -> 把按鈕的訊號反轉順便同步
         end
     end
 
@@ -26,7 +26,7 @@ module debounce_counter (
             cnt <= 0;
             btn_out <= 0;
         end else begin
-            // 如果同步後的輸入訊號 != 目前輸出狀態
+            // 輸入不等於輸出時 -> 代表訊號變了要開始計數
             if (btn_sync[1] != btn_out) begin
                 // 開始計數
                 if (cnt < DEBOUNCE_TIME) begin

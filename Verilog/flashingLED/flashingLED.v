@@ -4,6 +4,8 @@ module flashingLED (
     output [3:0] LED 
 );
 
+    localparam DEFAULT_SPEED = 5'd23;
+
     reg [4:0] speed_sel;
     reg btn_key0_lastclk, btn_key1_lastclk;
     wire btn_key0_out, btn_key1_out, btn_key0_posedge, btn_key1_posedge;
@@ -21,7 +23,7 @@ module flashingLED (
     
     // divider divider_out[23] -> 2.94Hz/ 0.34s
     // 最高 21.47483648s
-    binary_counter #(.WIDTH(29)) divider (
+    binary_counter #(.WIDTH(30)) divider (
         .clk(clk), .rst_n(rst_n), .count(divider_out)
     );
     
@@ -37,13 +39,13 @@ module flashingLED (
             btn_key1_lastclk <= btn_key1_out;
         end
     end
-    assign btn_key0_posedge = btn_key0_lastclk & (~btn_key0_out);
-    assign btn_key1_posedge = btn_key1_lastclk & (~btn_key1_out);
+    assign btn_key0_posedge = (~btn_key0_lastclk) & btn_key0_out;
+    assign btn_key1_posedge = (~btn_key1_lastclk) & btn_key1_out;
 
     // flashingLED
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
-            speed_sel <= 5'd23;   
+            speed_sel <= DEFAULT_SPEED;  
         else begin
             if (btn_key0_posedge && speed_sel >= 1)
                 speed_sel <= speed_sel - 1;  // 快
