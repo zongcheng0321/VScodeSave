@@ -61,8 +61,8 @@ always @(*) begin
     endcase
 end
 
-always @(posedge CLK or negedge RST) begin
-    if (!RST) begin
+always @(posedge CLK or posedge RST) begin
+    if (RST) begin
         state <= S0;
 
         // initialize variable

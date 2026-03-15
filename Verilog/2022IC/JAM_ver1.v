@@ -50,8 +50,8 @@ parameter S0 = 3'd0,
 
 
 // 控制 FSM 執行
-always @(posedge CLK or negedge RST) begin
-    if(!RST) begin
+always @(posedge CLK or posedge RST) begin
+    if(RST) begin
         state <= S0;
     end else 
         state <= next_state;

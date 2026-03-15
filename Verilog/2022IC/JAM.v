@@ -17,7 +17,14 @@ output reg Valid );
 // 我們不需要慢慢找，我們可以同時擺上 7 個比較器 (Comparator)，讓它們在同一個瞬間告訴我們結果。
 //------------------------------------------------------------------------------------------------------
 // 要把S2、3、4改成不要用迴圈的方式
+reg [2:0] array [7:0]; 
 
+reg [2:0] ChangingPoint; // 替換點
+reg k = 1'd1; // 利用 [ChangingPoint + k] 尋找比替換點大的數
+reg [2:0] minNumPosition; // 比替換點大的最小數的位置
+reg [9:0] tempMinCost; // 暫存 MinCost 值以用於比較
+reg [2:0] CostCount; // 計數算了多少人的 Cost
+integer i;
 // S2 之中的比較
 // 判斷右邊是否大於左邊並產生替換點
 wire S2_cmp0 = (array[6] < array[7]);
@@ -28,7 +35,7 @@ wire S2_cmp4 = (array[2] < array[3]);
 wire S2_cmp5 = (array[1] < array[2]);
 wire S2_cmp6 = (array[0] < array[1]);
 // S3 之中的比較
-// 比較第一次找出誰比 array[ChangingPoint] 大
+// 比較誰比 array[ChangingPoint] 大，那就將會是比替換值大的最小值
 wire S3_cmp0 = (array[7] > array[ChangingPoint]);
 wire S3_cmp1 = (array[6] > array[ChangingPoint]);
 wire S3_cmp2 = (array[5] > array[ChangingPoint]);
@@ -38,17 +45,7 @@ wire S3_cmp5 = (array[2] > array[ChangingPoint]);
 wire S3_cmp6 = (array[1] > array[ChangingPoint]);
 
 
-reg [2:0] array [7:0]; 
 
-//reg [2:0] j = 3'd7; // array [j]
-//reg [2:0] j = 7, k =7;// array [j][k]
-reg [2:0] ChangingPoint; // 替換點
-reg k = 1'd1; // 利用 [ChangingPoint + k] 尋找比替換點大的數
-reg [2:0] minNumPosition; // 比替換點大的最小數的位置
-//reg [2:0] temp; // 做交換時暫存值
-reg [9:0] tempMinCost; // 暫存 MinCost 值以用於比較
-reg [2:0] CostCount; // 計數算了多少人的 Cost
-integer i;
 
 // 全排序 FSM
 reg [2:0] state;
@@ -62,10 +59,6 @@ always @(*) begin
     case (state)
         // 判斷右邊是否大於左邊並產生替換點
         S0: begin
-            // initialize variable that will be used later
-            //j = 3'd7;
-            //k = 1'd1;
-            //temp = 3'd0;
             W = CostCount;
             J = array[CostCount];
         end
@@ -77,8 +70,8 @@ always @(*) begin
     endcase
 end
 
-always @(posedge CLK or negedge RST) begin
-    if (!RST) begin
+always @(posedge CLK or posedge RST) begin
+    if (RST) begin
         state <= S0;
 
         // initialize variable
@@ -142,7 +135,7 @@ always @(posedge CLK or negedge RST) begin
                 end else begin
                     // 當已經把所有排列完成，右邊沒有任何數小於左邊
                     // 拉高 Vaild 結束模擬
-                    Valid = 1'd1;
+                    Valid <= 1'd1;
                 end
             end
             S3: begin
@@ -154,27 +147,35 @@ always @(posedge CLK or negedge RST) begin
                 if (S3_cmp0) begin
                     minNumPosition <= 3'd7;
                     array[7] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[7];
                 end else if (S3_cmp1) begin
                     minNumPosition <= 3'd6;
                     array[6] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[6];
                 end else if (S3_cmp2) begin
                     minNumPosition <= 3'd5;
                     array[5] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[5];
                 end else if (S3_cmp3) begin
                     minNumPosition <= 3'd4;
                     array[4] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[4];
                 end else if (S3_cmp4) begin
                     minNumPosition <= 3'd3;
                     array[3] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[3];
                 end else if (S3_cmp5) begin
                     minNumPosition <= 3'd2;
                     array[2] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[2];
                 end else if (S3_cmp6) begin
                     minNumPosition <= 3'd1;
                     array[1] <= array[ChangingPoint];
+                    array[ChangingPoint] <= array[1];
                 end else begin
                     minNumPosition <= minNumPosition;
                 end
+                state <= S4;
             end
             S4: begin
                 // 翻轉一維陣列，根據 ChangingPoint 來去看說要做哪裡個翻轉
@@ -211,7 +212,7 @@ always @(posedge CLK or negedge RST) begin
                     // 歸零計算成本及 CostCount
                     tempMinCost <= 0;
                     CostCount <= 0;
-                    state = S0;
+                    state <= S0;
             end
             default: state <= state;
         endcase
