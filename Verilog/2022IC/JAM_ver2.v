@@ -152,7 +152,7 @@ always @(posedge CLK or negedge RST) begin
                     i <= i + 1;
                 end else begin
                     // 排序完成，回到 S0、S1計算 MinCost、MatchCount
-                    // 歸零計算成本及
+                    // 歸零計算成本及 CostCount
                     tempMinCost <= 0;
                     CostCount <= 0;
                     state = S0;

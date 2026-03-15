@@ -8,10 +8,6 @@ output reg [3:0] MatchCount,
 output reg [9:0] MinCost,
 output reg Valid );
 
-//always @(*) 組合邏輯中，意味著你要求硬體在「同一個瞬間」把 W 腳位變成 0, 1, 2...7，並期望 Cost 接腳瞬間給出 8 個對應的回傳值。這在真實世界是做不到的！
-//解法： 讀取 Cost 必須透過 Clock 驅動，利用計數器（Counter）在 8 個 Clock 週期內，一次送出一組 W 和 J，並把收到的 Cost 慢慢累加。
-//2. 組合邏輯中的自我累加 (k++, tempMinCost += Cost)
-//在 always @(*) 這種組合邏輯區塊內，寫出 k++ (等同於 k = k + 1) 或是 j-- 會產生組合邏輯迴路 (Combinational Loop)。因為沒有 Clock 控制，訊號會在閘道器之間無限狂奔，導致模擬器當機。
 
 // 等等再改做兩次可能會大於 600000 cycles，我把它改成一次試試看。
 // 把所有 for 跟 ++ --電路寫到序向邏輯
@@ -20,9 +16,31 @@ output reg Valid );
 // 在軟體裡，我們習慣用 for 迴圈從右邊慢慢往左邊找（$O(n)$ 的時間）。但在硬體裡，我們擁有「平行處理」的超能力。
 // 我們不需要慢慢找，我們可以同時擺上 7 個比較器 (Comparator)，讓它們在同一個瞬間告訴我們結果。
 //------------------------------------------------------------------------------------------------------
+// 要把S2、3、4改成不要用迴圈的方式
+
+// S2 之中的比較
+// 判斷右邊是否大於左邊並產生替換點
+wire S2_cmp0 = (array[6] < array[7]);
+wire S2_cmp1 = (array[5] < array[6]);
+wire S2_cmp2 = (array[4] < array[5]);
+wire S2_cmp3 = (array[3] < array[4]);
+wire S2_cmp4 = (array[2] < array[3]);
+wire S2_cmp5 = (array[1] < array[2]);
+wire S2_cmp6 = (array[0] < array[1]);
+// S3 之中的比較
+// 比較第一次找出誰比 array[ChangingPoint] 大
+wire S3_cmp0 = (array[7] > array[ChangingPoint]);
+wire S3_cmp1 = (array[6] > array[ChangingPoint]);
+wire S3_cmp2 = (array[5] > array[ChangingPoint]);
+wire S3_cmp3 = (array[4] > array[ChangingPoint]);
+wire S3_cmp4 = (array[3] > array[ChangingPoint]);
+wire S3_cmp5 = (array[2] > array[ChangingPoint]);
+wire S3_cmp6 = (array[1] > array[ChangingPoint]);
+
+
 reg [2:0] array [7:0]; 
 
-reg [2:0] j = 3'd7; // array [j]
+//reg [2:0] j = 3'd7; // array [j]
 //reg [2:0] j = 7, k =7;// array [j][k]
 reg [2:0] ChangingPoint; // 替換點
 reg k = 1'd1; // 利用 [ChangingPoint + k] 尋找比替換點大的數
@@ -45,8 +63,8 @@ always @(*) begin
         // 判斷右邊是否大於左邊並產生替換點
         S0: begin
             // initialize variable that will be used later
-            j = 3'd7;
-            k = 1'd1;
+            //j = 3'd7;
+            //k = 1'd1;
             //temp = 3'd0;
             W = CostCount;
             J = array[CostCount];
@@ -100,17 +118,27 @@ always @(posedge CLK or negedge RST) begin
                 state <= S2;
             end
             S2: begin // 判斷右邊是否大於左邊並產生替換點
-                // e.g. array[7] > array[6] 右邊大於左邊
-                if (j > 0) begin // 中止條件 if j <= 0 -> j - 1 = -1 -> WRONG
-                    if (array[j] > array[j - 1]) begin
-                        ChangingPoint <= j - 1; //當右邊比較大時，將左邊設為替換點
-                        minNumPosition <= j + 1; // 預設值為 ChangingPoint 的右邊第一個
-                        state <= S3; 
-                    // 如果右邊不大於左邊，找下一個
-                    end else begin
-                        j <= j - 1;
-                        state <= S2;
-                    end
+                if (S2_cmp0) begin
+                    ChangingPoint <= 3'd6;
+                    state <= S3;
+                end else if (S2_cmp1) begin
+                    ChangingPoint <= 3'd5;
+                    state <= S3;
+                end else if (S2_cmp2) begin
+                    ChangingPoint <= 3'd4;
+                    state <= S3;
+                end else if (S2_cmp3) begin
+                    ChangingPoint <= 3'd3;
+                    state <= S3;
+                end else if (S2_cmp4) begin
+                    ChangingPoint <= 3'd2;
+                    state <= S3;
+                end else if (S2_cmp5) begin
+                    ChangingPoint <= 3'd1;
+                    state <= S3;
+                end else if (S2_cmp6) begin
+                    ChangingPoint <= 3'd0;
+                    state <= S3;
                 end else begin
                     // 當已經把所有排列完成，右邊沒有任何數小於左邊
                     // 拉高 Vaild 結束模擬
@@ -118,51 +146,72 @@ always @(posedge CLK or negedge RST) begin
                 end
             end
             S3: begin
-                if ((ChangingPoint + k) < 8) begin // 中止條件 當已經跑完整個陣列在 else 那邊做替換點與 minNumPosition 交換
-                    if (array[ChangingPoint] < array[ChangingPoint + k] ) begin // 找到比替換數大的數字
-                        if (array[minNumPosition] >= array[ChangingPoint + k] ) begin // 在這之中找最小值
-                            minNumPosition <= ChangingPoint + k;
-                            k <= k + 1;
-                            state <= S3;
-                        end else begin
-                            k <= k + 1;
-                            state <= S3;
-                        end
-                    end else begin
-                        k <= k + 1;
-                        state <= S3;
-                    end
+                // 在替換點右邊的的數字中，找到比替換數大的最小數字，將之和替換數交換
+                // 經過 S2 發現因為一直比較右邊是否大於左邊，所以 ChangingPoint 右邊的陣列一定是由大到小排列的。
+                // 比較 從 array [7] -> [1] 如果是大於 array[ChangingPoint]，由此可知他一定是 minNumPosition
+                // 因為從大到小陣列的左邊去掃到右邊，第一個掃到的一定是比 array[ChangingPoint] 大，但又是在比他大的數之中的最小值。
+                // 同時做替換點值與 minNumPosition 值交換
+                if (S3_cmp0) begin
+                    minNumPosition <= 3'd7;
+                    array[7] <= array[ChangingPoint];
+                end else if (S3_cmp1) begin
+                    minNumPosition <= 3'd6;
+                    array[6] <= array[ChangingPoint];
+                end else if (S3_cmp2) begin
+                    minNumPosition <= 3'd5;
+                    array[5] <= array[ChangingPoint];
+                end else if (S3_cmp3) begin
+                    minNumPosition <= 3'd4;
+                    array[4] <= array[ChangingPoint];
+                end else if (S3_cmp4) begin
+                    minNumPosition <= 3'd3;
+                    array[3] <= array[ChangingPoint];
+                end else if (S3_cmp5) begin
+                    minNumPosition <= 3'd2;
+                    array[2] <= array[ChangingPoint];
+                end else if (S3_cmp6) begin
+                    minNumPosition <= 3'd1;
+                    array[1] <= array[ChangingPoint];
                 end else begin
-                    // 替換點值與 minNumPosition 值交換
-                    array[ChangingPoint] <= array[minNumPosition];
-                    array[minNumPosition] <= array[ChangingPoint];
-                    state <= S4;
-                    // setting i default
-                    i <= ChangingPoint + 1;
+                    minNumPosition <= minNumPosition;
                 end
             end
             S4: begin
-                // 翻轉一維陣列，ChangingPoint + 1 為替換點後的數字的第一個
-                // 8 - i + 1 定義為需要翻轉之陣列的 Size
-                if (i < (8 - i + 1)/2) begin
-                    array[i] <= array[8 - i]; // 1、7 or 2、6 or 3、5 exchange
-                    array[8 - i] <= array[i];
-                    i <= i + 1;
-                end else begin
+                // 翻轉一維陣列，根據 ChangingPoint 來去看說要做哪裡個翻轉
+                case (ChangingPoint)
+                    3'd0: begin // 當為 0 時，翻轉 7、1 6、2 5、3
+                        array[1] <= array[7]; array[7] <= array[1];
+                        array[2] <= array[6]; array[6] <= array[2];
+                        array[3] <= array[5]; array[5] <= array[3];
+                    end
+                    3'd1: begin // 當為 0 時，翻轉 7、2 3、6 4、5
+                        array[2] <= array[7]; array[7] <= array[2];
+                        array[3] <= array[6]; array[6] <= array[3];
+                        array[4] <= array[5]; array[5] <= array[4];
+                    end
+                    3'd2: begin
+                        array[3] <= array[7]; array[7] <= array[3];
+                        array[4] <= array[6]; array[6] <= array[4];
+                    end
+                    3'd3: begin
+                        array[4] <= array[7]; array[7] <= array[4];
+                        array[5] <= array[6]; array[6] <= array[5];
+                    end
+                    3'd4: begin
+                        array[5] <= array[7]; array[7] <= array[5];
+                    end
+                    3'd5: begin
+                        array[6] <= array[7]; array[7] <= array[6];
+                    end
+                    // ChangingPoint 是 6 的話，右邊只有一個元素，不需要翻轉
+                    default: ;
+                endcase
+
                     // 排序完成，回到 S0、S1計算 MinCost、MatchCount
-                    // 歸零計算成本及
+                    // 歸零計算成本及 CostCount
                     tempMinCost <= 0;
                     CostCount <= 0;
                     state = S0;
-                end
-/*
-                for (i = ChangingPoint + 1; i < (8 - i + 1)/2; i++) begin
-                    temp = array[i];
-                    array[i] = array[8 - i]; // 1、7 or 2、6 or 3、5 exchange
-                    array[8 - i] = temp;
-                end
-                state = S0;
-                */
             end
             default: state <= state;
         endcase
