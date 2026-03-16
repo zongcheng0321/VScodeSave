@@ -18,13 +18,11 @@ output reg Valid );
 //------------------------------------------------------------------------------------------------------
 // 要把S2、3、4改成不要用迴圈的方式
 reg [2:0] array [7:0]; 
-
 reg [2:0] ChangingPoint; // 替換點
-reg k = 1'd1; // 利用 [ChangingPoint + k] 尋找比替換點大的數
 reg [2:0] minNumPosition; // 比替換點大的最小數的位置
 reg [9:0] tempMinCost; // 暫存 MinCost 值以用於比較
 reg [2:0] CostCount; // 計數算了多少人的 Cost
-integer i;
+
 // S2 之中的比較
 // 判斷右邊是否大於左邊並產生替換點
 wire S2_cmp0 = (array[6] < array[7]);
@@ -42,10 +40,6 @@ wire S3_cmp2 = (array[5] > array[ChangingPoint]);
 wire S3_cmp3 = (array[4] > array[ChangingPoint]);
 wire S3_cmp4 = (array[3] > array[ChangingPoint]);
 wire S3_cmp5 = (array[2] > array[ChangingPoint]);
-wire S3_cmp6 = (array[1] > array[ChangingPoint]);
-
-
-
 
 // 全排序 FSM
 reg [2:0] state;
@@ -62,7 +56,6 @@ always @(*) begin
             W = CostCount;
             J = array[CostCount];
         end
-
         default: begin
             W = 3'd0;
             J = 3'd0;
@@ -80,9 +73,16 @@ always @(posedge CLK or posedge RST) begin
         Valid <= 0;
         tempMinCost <= 0;
         CostCount <= 0;
-        for (i = 0; i < 8; i++) begin // array at the beginning is [0,1,2,3,4,5,6,7]
-            array[i] <= i;
-        end
+        
+        array[0] <= 3'd0;
+        array[1] <= 3'd1;
+        array[2] <= 3'd2;
+        array[3] <= 3'd3;
+        array[4] <= 3'd4;
+        array[5] <= 3'd5;
+        array[6] <= 3'd6;
+        array[7] <= 3'd7;
+        
     end else begin
         case (state)
             S0: begin
@@ -92,7 +92,7 @@ always @(posedge CLK or posedge RST) begin
                     state <= S1;
                     CostCount <= 0;
                 end else begin
-                    CostCount <= CostCount + 1;
+                    CostCount <= CostCount + 3'd1;
                 end
             end 
             S1: begin
@@ -102,7 +102,7 @@ always @(posedge CLK or posedge RST) begin
                     MinCost <= tempMinCost;
                     MatchCount <= 4'd1;
                 end else if (tempMinCost == MinCost) begin
-                    MatchCount <= MatchCount + 1;
+                    MatchCount <= MatchCount + 4'd1;
                 end else begin
                     MinCost <= MinCost;
                     MatchCount <= MatchCount;
@@ -141,39 +141,30 @@ always @(posedge CLK or posedge RST) begin
             S3: begin
                 // 在替換點右邊的的數字中，找到比替換數大的最小數字，將之和替換數交換
                 // 經過 S2 發現因為一直比較右邊是否大於左邊，所以 ChangingPoint 右邊的陣列一定是由大到小排列的。
-                // 比較 從 array [7] -> [1] 如果是大於 array[ChangingPoint]，由此可知他一定是 minNumPosition
-                // 因為從大到小陣列的左邊去掃到右邊，第一個掃到的一定是比 array[ChangingPoint] 大，但又是在比他大的數之中的最小值。
-                // 同時做替換點值與 minNumPosition 值交換
+                // 比較 從 array [7] -> [1] 如果是大於 array[ChangingPoint]，由此可知他一定是大的數之中的最小值
+                // 因為從大到小陣列的右邊去掃到左邊，第一個掃到的一定是比 array[ChangingPoint] 大，但又是在比他大的數之中的最小值。
+                // 同時做替換點值與最小值交換
                 if (S3_cmp0) begin
-                    minNumPosition <= 3'd7;
                     array[7] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[7];
                 end else if (S3_cmp1) begin
-                    minNumPosition <= 3'd6;
                     array[6] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[6];
                 end else if (S3_cmp2) begin
-                    minNumPosition <= 3'd5;
                     array[5] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[5];
                 end else if (S3_cmp3) begin
-                    minNumPosition <= 3'd4;
                     array[4] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[4];
                 end else if (S3_cmp4) begin
-                    minNumPosition <= 3'd3;
                     array[3] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[3];
                 end else if (S3_cmp5) begin
-                    minNumPosition <= 3'd2;
                     array[2] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[2];
-                end else if (S3_cmp6) begin
-                    minNumPosition <= 3'd1;
+                end else begin
                     array[1] <= array[ChangingPoint];
                     array[ChangingPoint] <= array[1];
-                end else begin
-                    minNumPosition <= minNumPosition;
                 end
                 state <= S4;
             end
