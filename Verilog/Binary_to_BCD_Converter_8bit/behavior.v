@@ -32,3 +32,25 @@ always @(*) begin //按圖施工保證成功
     P[8:5] = s7;
 end
 endmodule
+// 下面的版本較好!!
+module converter(
+    input [11:0] in,
+    output reg [15:0] bcd
+);
+
+    wire [14:0] bin = {2'b0, in};
+
+    always @(bin) begin
+        bcd = 0; // 初始化
+        for (integer i = 0; i < 14; i = i + 1) begin
+            // 改用三元運算子，讓 X 能夠正確擴散
+            bcd[3:0]   = (bcd[3:0] >= 5)   ? (bcd[3:0] + 3)   : bcd[3:0];
+            bcd[7:4]   = (bcd[7:4] >= 5)   ? (bcd[7:4] + 3)   : bcd[7:4];
+            bcd[11:8]  = (bcd[11:8] >= 5)  ? (bcd[11:8] + 3)  : bcd[11:8];
+            bcd[15:12] = (bcd[15:12] >= 5) ? (bcd[15:12] + 3) : bcd[15:12];
+            
+            // Shift
+            bcd = {bcd[14:0], bin[13-i]};
+        end
+    end
+endmodule
