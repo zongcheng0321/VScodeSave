@@ -1,0 +1,74 @@
+當然可以！將硬體模組**參數化（Parameterized）**是非常好的設計習慣，這樣未來無論是 8-bit、16-bit 還是 32-bit 的輸入，都可以直接重複使用同一份程式碼，大幅提高可攜性與維護性。
+
+要寫出自訂寬度的 Double Dabble 轉換器，我們需要解決一個核心問題：**既然 BCD 的長度是變動的，我們就不能像之前那樣手動把 `bcd[3:0]`、`bcd[7:4]` 一行一行寫出來。**
+
+解決方法是**在原本的位移迴圈內，再包一層內部迴圈**，並搭配 Verilog-2001 非常好用的動態位元切片語法 `[base_index +: width]`。
+
+以下是為你量身打造的自訂寬度版本：
+
+### 自訂寬度 Bin to BCD 模組
+
+```verilog
+module parameterized_bin2bcd #(
+    parameter BIN_WIDTH  = 12, // 輸入的二進位位元數
+    parameter BCD_DIGITS = 4   // 預期的 BCD 輸出「位數」（每位數佔 4 bits）
+)(
+    input  [BIN_WIDTH-1:0]        in,
+    output reg [(BCD_DIGITS*4)-1:0] bcd
+);
+
+    integer i, j; // i 用於推進 binary，j 用於掃描每個 BCD digit
+
+    always @(*) begin
+        bcd = 0; // 初始化所有位元為 0
+        
+        // 外層迴圈：執行次數等於輸入的 Binary 位元數
+        for (i = 0; i < BIN_WIDTH; i = i + 1) begin 
+            
+            // 1. 內層迴圈：檢查每一個 4-bit 的 BCD 區塊
+            for (j = 0; j < BCD_DIGITS; j = j + 1) begin
+                // 使用 Verilog-2001 的 indexed part-select [base +: width] 語法
+                // 它會從 j*4 開始，往上抓 4 個 bit
+                bcd[j*4 +: 4] = (bcd[j*4 +: 4] >= 5) ? (bcd[j*4 +: 4] + 3) : bcd[j*4 +: 4];
+            end
+            
+            // 2. 左移一位，並將 Binary 輸入由最高位 (MSB) 補入
+            bcd = {bcd[(BCD_DIGITS*4)-2 : 0], in[BIN_WIDTH-1-i]};
+        end
+    end
+
+endmodule
+```
+
+---
+
+### 關鍵寫法解析
+
+#### 1. 使用 `parameter` 定義寬度
+我將參數切分為 `BIN_WIDTH` 與 `BCD_DIGITS`。
+* `BIN_WIDTH` 直接決定外層迴圈要跑幾次。
+* `BCD_DIGITS` 代表你需要幾個十進制數字。因為每個十進制數字需要 4 個 bits，所以總輸出寬度會自動計算為 `(BCD_DIGITS*4)-1 : 0`。
+
+#### 2. 動態位元切片語法 `[base +: width]`
+在 Verilog 中，傳統的切片語法 `[A : B]` 不允許 A 和 B 都是變數，這會導致編譯錯誤。
+為了讓迴圈變數 `j` 能動態選擇 BCD 的區塊，我們必須使用 `[base_index +: width]`：
+* `base_index` 可以是變數（這裡是 `j*4`）。
+* `width` 必須是常數（這裡是 `4`，代表 4 個 bits）。
+* 當 `j = 0`，它抓取 `[0 +: 4]`，等同於 `bcd[3:0]`。
+* 當 `j = 1`，它抓取 `[4 +: 4]`，等同於 `bcd[7:4]`，依此類推。
+
+#### 3. 如何實例化 (Instantiation) 呼叫它？
+當你在其他模組要使用這個轉換器時，可以透過覆寫參數來改變寬度。例如，你需要一個 8-bit 二進位轉 3 位 BCD (12 bits) 的轉換器：
+
+```verilog
+// 呼叫時覆寫參數
+parameterized_bin2bcd #(
+    .BIN_WIDTH(8),
+    .BCD_DIGITS(3)
+) my_converter (
+    .in(my_8bit_signal),
+    .bcd(my_12bit_bcd_signal)
+);
+```
+
+這樣的寫法不僅邏輯清晰，合成出來的硬體電路也會依據你給定的參數，精準展開成所需要的加法器與多工器網路。

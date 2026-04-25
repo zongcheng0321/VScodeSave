@@ -38,11 +38,11 @@ module converter(
     output reg [15:0] bcd
 );
 
-    wire [14:0] bin = {2'b0, in};
+    //wire [15:0] bin = {4'b0, in}; // 前面補 4 個 0 因為只要 12 個輸入
 
-    always @(bin) begin
+    always @(in) begin
         bcd = 0; // 初始化
-        for (integer i = 0; i < 14; i = i + 1) begin
+        for (integer i = 0; i < 12; i = i + 1) begin // 輸入是 12 bits，所以精準執行 12 次 (i = 0 到 11)
             // 改用三元運算子，讓 X 能夠正確擴散
             bcd[3:0]   = (bcd[3:0] >= 5)   ? (bcd[3:0] + 3)   : bcd[3:0];
             bcd[7:4]   = (bcd[7:4] >= 5)   ? (bcd[7:4] + 3)   : bcd[7:4];
@@ -50,7 +50,8 @@ module converter(
             bcd[15:12] = (bcd[15:12] >= 5) ? (bcd[15:12] + 3) : bcd[15:12];
             
             // Shift
-            bcd = {bcd[14:0], bin[13-i]};
+            //bcd = {bcd[14:0], bin[11-i]};
+            bcd = {bcd[14:0], in[11-i]}; // 不補 0 也可以，因為 bcd 初始化為 0
         end
     end
 endmodule
