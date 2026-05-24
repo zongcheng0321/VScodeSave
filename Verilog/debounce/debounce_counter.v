@@ -33,7 +33,7 @@ module debounce_counter (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             cnt <= 0;
-            btn_out <= 0;
+            btn_out <= 1'b1;
         end else begin
             // 如果同步後的輸入訊號 != 目前輸出狀態
             if (btn_sync[1] != btn_out) begin

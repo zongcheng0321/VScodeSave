@@ -90,7 +90,7 @@ module debounce_fsm (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             counter <= 0;
-            btn_out <= 0;
+            btn_out <= 1'b1;
         end else begin
             // 計數器邏輯
             if (current_state == S_CHECK_RISING || current_state == S_CHECK_FALLING) begin

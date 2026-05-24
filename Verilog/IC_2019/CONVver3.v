@@ -13,12 +13,8 @@
 結果：面積變小了（只用了 1 個加法器），但速度變慢了（需要 4 個 cycle 才算完）。
 */
 
-// 
-// 土法煉鋼，測試到底能捨棄多少小數才不會多 1 或 少 1
-// 我們需要捨棄 mul_out[15:0] -> 捨棄 [5:0]，保留 [15:6] 這 10 個 bit 當作小數的尾巴跟著累加
-// 把 Convolutional_out 改 30 bits
-// 節省暫存器
 
+// 改良 ver2 時序不違例，但 reg 數量差不多 -> 40bits
 module  CONV(
     input   clk,
     input   reset,
@@ -82,10 +78,8 @@ module  CONV(
     // 4 個相加 = 42 bits
     // 8 個相加 = 43 bits
     // 9 個相加 = 44 bits
-
-    // 我們需要捨棄 mul_out[15:0] -> 捨棄 [5:0]，保留 [15:6] 這 10 個 bit 當作小數的尾巴跟著累加
-    // 把 Convolutional_out 改 30 bits
-    reg signed [29:0] Convolutional_out; // 捲積輸出，預設會先為 bias 的值 
+    reg signed [19:0] Convolutional_out1; // 捲積輸出，預設會先為 bias 的值 
+    reg [19:0] Convolutional_out2; // 捲積輸出小數部分相加
     reg endConvolutional; // 結束捲積旗標
 
 //---------------------------------------------------------------
@@ -164,10 +158,12 @@ module  CONV(
     assign input_index = (target_row << 6) + target_col;
 //---------------------------------------------------------------
 // ReLU -revised
+    // 先把 40(44) bits 的結果做四捨五入
     wire signed [19:0] rounded_conv_out;
-    // 取出上方 20 bits [24:5]，加上判斷位元 [4] 進行四捨五入
-    assign rounded_conv_out = Convolutional_out[29:10] + Convolutional_out[9];
+    // Convolutional_out2[19:16] 是 9 次小數相加累積出來的整數進位，Convolutional_out2[15] 是判斷是否四捨五入
+    assign rounded_conv_out = Convolutional_out1 + Convolutional_out2[19:16] + Convolutional_out2[15];
 
+    // 把四捨五入後的結果丟給 ReLU
     wire signed [19:0] relu_result;
     // 如果最高位 [19] 是 1 代表是負數，輸出 0；否則輸出四捨五入的結果
     assign relu_result = (rounded_conv_out[19] == 1'b1) ? 20'd0 : rounded_conv_out;
@@ -289,9 +285,9 @@ module  CONV(
                     // 就已經等於 17 bit 的 1/2 了，所以後面再有東西也會進位
                     // 只需要把小數的 MSB 加到那 20bits 上即可
                     // 原本的東西是 12 bits 整數 + 32 bits 小數 -> 36~43 8bits 整數捨去，往回數20個
-                    // Layer0_out <= relu_result[35:16] + relu_result[15]; ---捨棄
-                    
+                    //Layer0_out <= relu_result[35:16] + relu_result[15]; ---捨棄
                     caddr_wr <= caddr_wr + 12'd1;
+                    
                     state_main <= OUTPUT_LAYER0;
                 end
 
@@ -419,6 +415,14 @@ module  CONV(
     end
 
 //---------------------------------------------------------------
+// 用 20 bits 的 Convolutional_out 在每個 state 做四捨五入，發現輸出有時少 1 -> ex. 0.4 + 0.4 + 0.4
+// 在每一個產出 0.4 的時候四捨五入導致變成 0 + 0 + 0 = 0，但實際上要  0.4 + 0.4 + 0.4 = 1.2 進位!
+
+// 此版本把 Convolutional_out 拆成 signed 20bits Convolutional_out1、20bits Convolutional_out2
+// signed [19:0] Convolutional_out; 專門累加 mul_out[35:16] 的主要部分(整數絕對不會超過 16 所以 35 bit 後捨棄)；
+// [19:0] Convolutional_out2 做 mul_out[15:0]累加 -> 九次累加最多 + 4bits = 19 bits 絕對不會超過 20bits 溢位
+// 這樣一來可以避免 43bits + 40 bits 的加法器時序違例
+
 // kernel 宣告
     wire signed [19:0] kernel0 [2:0][2:0]; // ( 4bits整數+16bits小數)
     assign kernel0 [0][0] = 20'h0A89E; // 一開始要用複製的，自己打有可能打錯...
@@ -440,7 +444,8 @@ module  CONV(
             mul_in1 <= 0;
             mul_in2 <= 0;
             state_Convolutional <= 0;
-            Convolutional_out <= 0;
+            Convolutional_out1 <= 0;
+            Convolutional_out2 <= 0;
             endConvolutional <= 0;
         end else begin
             case (state_Convolutional) 
@@ -451,61 +456,72 @@ module  CONV(
                 end
                 4'd1: begin    // 從 main 接收到訊號 (state更換) 開始捲積
                     //Convolutional_out <= 43'h01310; 錯誤，這樣會從最後面變成小數，必須指定 20 bits
-                    Convolutional_out <= {20'h01310, 10'd0}; // 捲積輸出必須重製，這邊重製為 bias 的值 01310H，不然會用到上一個的結果
+                    //Convolutional_out <= {8'd0, 20'h01310, 16'd0}; // 捲積輸出必須重製，這邊重製為 bias 的值 01310H，不然會用到上一個的結果
+                    Convolutional_out1 <= 20'h01310;
+                    Convolutional_out2 <= 0;
                     mul_in1 <= pixels[0][0];
                     mul_in2 <= kernel0[0][0];
                     state_Convolutional <= 4'd2;
                 end
                 4'd2: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[0][1];
                     mul_in2 <= kernel0[0][1];
                     state_Convolutional <= 4'd3;
                 end
                 4'd3: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[0][2];
                     mul_in2 <= kernel0[0][2];
                     state_Convolutional <= 4'd4;
                 end
                 4'd4: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[1][0];
                     mul_in2 <= kernel0[1][0];
                     state_Convolutional <= 4'd5;
                 end
                 4'd5: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[1][1];
                     mul_in2 <= kernel0[1][1];
                     state_Convolutional <= 4'd6;
                 end
                 4'd6: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[1][2];
                     mul_in2 <= kernel0[1][2];
                     state_Convolutional <= 4'd7;
                 end
                 4'd7: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[2][0];
                     mul_in2 <= kernel0[2][0];
                     state_Convolutional <= 4'd8;
                 end
                 4'd8: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[2][1];
                     mul_in2 <= kernel0[2][1];
                     state_Convolutional <= 4'd9;
                 end
                 4'd9: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6];
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16];
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     mul_in1 <= pixels[2][2];
                     mul_in2 <= kernel0[2][2];
                     state_Convolutional <= 4'd10;
                 end
                 4'd10: begin
-                    Convolutional_out <= Convolutional_out + mul_out[35:6]; // 在這邊已經做到捲積完 + bias 的結果
+                    Convolutional_out1 <= Convolutional_out1 + mul_out[35:16]; // 在這邊已經做到捲積完 + bias 的結果
+                    Convolutional_out2 <= Convolutional_out2 + mul_out[15:0];
                     state_Convolutional <= 4'd11; // 等待一個 clk
                     endConvolutional <= 1'd1; // 旗標拉高讓 state_main 去 GET_WIDTH
                 end

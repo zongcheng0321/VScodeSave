@@ -1,3 +1,5 @@
+// 不能使用!做到一半
+
 module  CONV(
     input   clk,
     input   reset,

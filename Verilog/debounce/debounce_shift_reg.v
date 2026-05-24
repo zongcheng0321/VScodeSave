@@ -42,7 +42,7 @@ module debounce_shift_reg (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             shift_reg <= 4'b0000;
-            btn_out <= 0;
+            btn_out <= 1'b1;
         end else if (sample_tick) begin
             // 每次 Tick 發生時，將輸入訊號推入暫存器 (LSB in)
             shift_reg <= {shift_reg[2:0], btn_in};
