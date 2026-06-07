@@ -14,7 +14,7 @@
 */
 
 
-// 改良 ver2 時序不違例，但 reg 數量差不多 -> 40bits
+// 改良 ver2 ，但 reg 數量差不多 -> 40bits
 module  CONV(
     input   clk,
     input   reset,

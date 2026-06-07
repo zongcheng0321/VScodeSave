@@ -15,6 +15,7 @@
 // Timing violation Convolutional_out 5NS, endConvolutional 45NS  Convolutional_out[36~41] 45NS state_main[3] 45NS col、rol 45NS state_Convolutional 45NS
 // caddr_wr 45NS
 // 合成不通過，時序違例!
+// 不是，是因為pre_sim 沒有吃到sdf檔!!!!
 module  CONV(
     input   clk,
     input   reset,

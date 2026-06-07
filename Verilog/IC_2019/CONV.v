@@ -18,7 +18,7 @@
 // 我們需要捨棄 mul_out[15:0] -> 捨棄 [5:0]，保留 [15:6] 這 10 個 bit 當作小數的尾巴跟著累加
 // 把 Convolutional_out 改 30 bits
 // 節省暫存器
-
+// 但其實不要這樣做，因為這是再猜測測試資料
 module  CONV(
     input   clk,
     input   reset,
