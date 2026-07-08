@@ -86,7 +86,7 @@ always @(posedge clk or posedge reset) begin
                 // wait CMD input
                 if (cmd_valid) begin
                     cmd_input <= cmd;
-                    temp <= image[index1];  // max, min, average 需要用到
+                    temp <= {2'd0,image[index1]};  // max, min, average 需要用到
                     count <= 0;             // max, min, average 需要用到
                     busy <= 1'b1; // 拉高開始執行此指令
                     state <= OPERATION;
