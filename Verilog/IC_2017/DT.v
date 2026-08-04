@@ -54,7 +54,7 @@ assign P = (Pxy == 0)? 1'd0: (is_forwardPass)? P_forward: P_backward;
 // input
 reg is_first_data;
 reg [3:0] sti_index; // 0 ~ 15, forward 時要從 15 ~ 0, backward 要從 0 ~ 15, 由於 x,y = (1,1) 所以要從 14 or 1 開始
-reg [9:0] sti_ROM_addr; // 每做 16 個就 + 1 -> 當 sti_index = 15 時
+reg [9:0] sti_ROM_addr; // 每做 16 個就 + 1 -> 當 sti_index = 0 時
 reg [6:0] x, y; // 0 ~ 127
 
 wire [6:0] truth_x, truth_y; // 因為我們的 x y 都是從 (1,1) ~ (126,126)，但 backward pass 要從 (126,126) ~ (1,1)，所以要用 127 去減(最後一個點為 127,127)
@@ -161,8 +161,8 @@ always @(posedge clk or negedge reset) begin
 				if (is_first_data) begin
 					state <= UPDATE_STI_INDEX; // 第一筆資料還沒要的時候下一個狀態會去 UPDATE_STI_INDEX 更新 Pxy
 					is_first_data <= 0;
-				end else begin // 當 sti_index == 15 時跳轉到這裡要一筆新資料
-					state <= INPUT_resRAM; // sti_index 現在為 0，且在 UPDATE_STI_INDEX 狀態已經更新 Pxy = sti_di[15]，已經產出 Pxy 就去要其他 P 值
+				end else begin // 當 sti_index == 0 時跳轉到這裡要一筆新資料
+					state <= INPUT_resRAM; // sti_index 現在為 0，且在 UPDATE_STI_INDEX 狀態已經更新 Pxy = sti_di[0]，已經產出 Pxy 就去要其他 P 值
 				end
 			end 
 
@@ -170,9 +170,8 @@ always @(posedge clk or negedge reset) begin
 			UPDATE_STI_INDEX: begin 
 				res_wr <= 0;
 				Pxy <= {7'd0, sti_di[sti_index]};
-				sti_index <= sti_index - 1'd1; // 此變數 0 ~ 15，當到達 15 時 + 1 會重製為 0
-											   // 此變數 15 ~ 0，當到達 0 時 - 1 會重製為 15
-				//if (sti_index == 4'd15) begin  // 到達 15 時，代表我要去 sti_rom 要新的 16 bits 資料了(backward)
+				sti_index <= sti_index - 1'd1; // 此變數 15 ~ 0，當到達 0 時 - 1 會重製為 15
+				
 				if (sti_index == 0) begin // 到達 0 時，代表我要去 sti_rom 要新的 16 bits 資料了(forward pass)
 					sti_ROM_addr <= sti_ROM_addr + 1'd1;
 					state <= INPUT_stiROM;
@@ -183,7 +182,9 @@ always @(posedge clk or negedge reset) begin
 			end
 
 			// forward pass : 依 cnt 填入 P1 to P4，當 old_Pxy = 0 時，去填 P1 ~ P4，old_Pxy != 0 時，只填 P3 且其他 P 移動位置
+			// backward pass : 我們需要偷一個 clk 來讓 Pxy 輸入，之後就如同 forward pass
 			INPUT_resRAM: begin
+				// 截斷要資料的 cycle
 				if (is_forwardPass && Pxy == 0) begin // 一定要加上 is_forwardPass && 不然在 backward pass 這邊的 Pxy 還沒進來
 					state <= OUTPUT; // Pxy 等於 0 代表不用去要資料，去 OUTPUT 更新 x, y 後直接回到 UPDATE_STI_INDEX 去更新新的 sti_index、Pxy
 				end else begin
@@ -260,13 +261,13 @@ always @(posedge clk or negedge reset) begin
 						done <= 1'd1;
 					end
 				end else begin
-					x <= x + 1'd1;
 					if (is_forwardPass) begin
 						state <= UPDATE_STI_INDEX;
 					end else begin
 						state <= ENTER_PXY_BACKWARD;
 					end
-
+					
+					x <= x + 1'd1;
 					if (x == 7'd126) begin // 換行
 						y <= y + 1'd1;
 						x <= 1'd1; // x 重製為 1
