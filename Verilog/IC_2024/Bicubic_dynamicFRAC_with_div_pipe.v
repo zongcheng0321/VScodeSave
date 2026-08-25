@@ -8,19 +8,24 @@
         //   因為如果被除數 + 1 bit 除法器面積就會變大，所以我利用 [被除數 + (除數 / 2)] / 除數的方式，這樣可以不用擴大除法器也可以得到四捨五入過後的商
 
 // compile ultra
-// 面積大的誇張15bits frac : 772005um 766300(div_pipe stages 2) time:668668ns 671084ns(div_pipe stages 2)
+//            15bits frac : 772005um 766300(div_pipe stages 2) time:668668ns 671084ns(div_pipe stages 2)
 //            10bits frac : 769781um 722626(div_pipe stages 2)
 // 改成了可以動態調整小數精度的程式、測試發現改成 15 bits 就過了 (不知為何timing violation 消失了) 
 // 改成使用 DW_div_pipe，值得注意的是 num_stages 如果是 2 就代表資料輸入的那個正緣後，只要在等 num_stages -1 = 1 個週期即可在下個正緣觸發取得資料
+
 // 使用 DW_div_pipe 且 num_stages = 2 在小數點精度為 10 bits 情況下不會 violation 了
+
+// pipeline比沒有的除法器面積還要小：
+// (沒有不一定，假設頻率高，電路要求較快算出答案，除法器壓力大就會用比較大的cell，但現在頻率要求低，增加pipe頻率除2，所以pipeline除法器是有餘裕的他就用cell面積小的)
 
 `timescale 1ns/10ps
 //     --- pipeline 除法器解決timing violation(-slack) ---
 //     ----. 多項式原本做法為 x * x -> 2o bits 後砍 10 bits ，改變多項式作法 -> [(ax + b)x +c]x + d 保留所有bits不捨去 ----
 //     ----. 小數點的精度到底要多少? ----
 //     9. 看別人的程式面積大小 GITHUB，別人都 * / % 直接用，如果合成面積一樣那我還要那麼麻煩幹嘛??
-//     ans1_Bicubic_suchuankai: 754159 um 但 timing 大 violation -4.51，解答cycle: 122436ns 少了我 6 倍
-//     ans2_Bicubic_bbnoir: 754159 um 但 timing 大 violation -4.51，解答cycle: 403388ns 少了我 1.6 倍
+//     ans1_Bicubic_suchuankai: 754159 um  timing 大 violation -4.51，解答cycle: 122436ns 少了我 6 倍
+//     ans2_Bicubic_bbnoir: 1002726 um  timing 大 violation -20.79，解答cycle: 403388ns 少了我 1.6 倍
+//     ---> 他們通通沒過 gatelevel simulation
 //     10. 測試 complie 跟 complie ultra 差在哪，使用 Bicubic_suchuankai
 //     ans : complie 面積為 770279 um 且 timing 為 -9.32 slack
 

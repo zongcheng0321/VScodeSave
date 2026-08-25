@@ -1,0 +1,18 @@
+
+FTP account:                       E25xxx
+
+Level:                             A/B/C/D/E
+Synthesis area:                    12000
+Total cycles:                      3000
+Total error points:                0
+
+--- RTL category---
+HDL simulator :                    xrun/vcs/vsim/... 
+RTL filename :                     CONVEX.v 
+
+--- Pre-layout gate-level ---
+gate-levelfilename:                CONVEX_syn.v  
+gate-level sdf filename:           CONVEX_syn.sdf        
+
+-----(annotation)--------------------------------------------------------
+ (optional, write down anything that you want raters know)

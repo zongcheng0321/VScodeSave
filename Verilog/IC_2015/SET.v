@@ -1,6 +1,8 @@
 // 非常厲害的 只要把 INPUT 裡面判斷 en == 1 拔掉，瞬間所有timing violation 就不見了
 // 記得刪除 en
 
+// mode 123可以用xor做??!!!
+
 // 半徑 1~15，所以無法使用查表方式，只能做出乘法器出來。
 module SET ( clk , rst, en, central, radius, mode, busy, valid, candidate );
 input clk, rst; // 非同步系統重置訊號。當此訊號為1時表示系統重置。 
