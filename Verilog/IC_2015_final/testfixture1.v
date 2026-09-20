@@ -67,7 +67,9 @@ initial begin
 //$dumpfile("ISE.vcd");
 //$dumpvars;
 //$fsdbDumpfile("ISE.fsdb");
-//$fsdbDumpvars;
+//$fsdbDumpvars();
+//$fsdbDumpMDA;
+
 
    out_f = $fopen("out.dat");
    if (out_f == 0) begin

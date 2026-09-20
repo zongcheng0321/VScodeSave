@@ -89,7 +89,6 @@ reg [7:0] RAM_data_in, RAM_data_out; // 0 ~ 255
 ResultSRAM u_ResultSRAM (.Q(RAM_data_out), .CLK(CLK), .CEN(RAM_en), .WEN(RAM_wr), .A(RAM_addr), .D(RAM_data_in)); // 16384 * 8 (A:[13:0] 14bits, Q:[7:0] 8bits)
 //------------------------------------------
 // 除法器及乘法器
-//parameter width = 8;
 parameter tc_mode = 0;
 parameter rem_mode = 1; // corresponds to "%" in Verilog
 /*
