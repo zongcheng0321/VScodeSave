@@ -1,10 +1,21 @@
+// 待處理
+
 // 關於排序：實作 quick/heap sort -> AI 說 verilog 不能做，需要用到 stack
 // Bitonic、Odd-Even Merge、Odd-Even Transposition、Shift Register Insertion、Radix Sort -> 硬體使用的排序演算法
 // 這題主要在考如何排序的方法
 
 // 做完 SORT1 去跑合成(compile 面積effort map effort) timing +0.94 area 11618
-// 後面發現如果先排完顏色再排強度，排強度因為顏色有三種，而每個顏色最多32張圖，等於會有三個硬體 -> 重想一下架構
-
+// 後面發現如果使用奇偶排序，先排完顏色再排強度，排強度因為顏色有三種，而每個顏色最多32張圖，還必須根據多少個同個顏色的圖去啟用多少個比較器長出 3*32 個多工器
+// 這樣想想面積都覺得大，所以我可能要先放棄想法: "先排顏色後，後對三塊未知長度的子陣列分別排強度"
+// 1. 奇偶排序還有另一個做法就是先排所有強度，後排顏色(試試看)
+// 2. 改為 bubble_sort(顏色先排)
+// 3. AI 提供另外兩種我沒想到的比較好的解法(甚至不用排顏色) 詳情見*** 「AI提供的想法.md」***
+//------------------------------------------
+// 解法二：將「顏色 + 強度」合併為單一鍵值 -> AI說是硬體最佳(?)
+// 能發揮奇偶排序（Odd-Even Sort）硬體特性的做法，完全不需要複雜的子陣列邊界判斷，且排序完即可直接依序輸出。
+// ...
+// ...
+//------------------------------------------
 `timescale 1ns/10ps
 module ISE( clk, reset, image_in_index, pixel_in, busy, out_valid, color_index, image_out_index);
 input              clk;   // 本系統為同步於時脈正緣之同步設計。 (註: Host 端採clk ”正”緣時送資料。) 
@@ -24,9 +35,10 @@ reg [3:0] state;
 localparam DECIDE_PIXEL_COLOR = 4'd0, // 判斷單一 Pixel 是否為 R or G or B
            IMAGE_CLASS = 4'd1,
            AVG_INTENSITY = 4'd2,
-           SORT1 = 4'd3,
-           SORT2 = 4'd4;
-
+           SORT1 = 4'd3,              // 先排顏色
+           SORT2_RED = 4'd4,          // 再排強度
+           SORT2_GREEN = 4'd5,
+           SORT2_BLUE = 4'd6;
 //------------------------------------------
 // current image_in_index
 // 不用計數 pixel 的方式去判斷是因為要多宣告 14 bits 的計數器，那不如我多花一個 clk 的時間去判斷當前圖的 image_in_index，只花 1 reg 跟 1 clk
@@ -61,12 +73,12 @@ assign cmp_class_R_g_B = pixel_color_R_total > pixel_color_B_total;
 // 排序強度時，原本想要一個 clk 就排完，但想到說強度的 bits 可能會達到 FRAC_BIT + 8 bits 的大小，如果小數點很大，比較器就很大，而且 32 個位置要一次比較
 // 比較器會花很多，大 bits 又很多比較器會很消耗面積，所以考慮一個一個 clk 慢慢排，減少比較器數量
 
-// 如果使用奇偶排序法，最多會耗 N 也就是 32 clk -> 320 ns，時間多沒多少，但會花 16 個比較器
+// 如果使用奇偶排序法，最多會耗 N 也就是 32 clk -> 320 ns，時間多沒多少，但會花 32 個比較器
 // 如果使用氣泡排序之類的，最多會耗 N^2 也就是 1,024 clk -> 10240 ns，時間多一萬，面積只花一個比較器
 // 兩者時間差了 
 // 16384(每個 pixel)*32 + 64(得出每張圖的類別跟算出平均強度) + 64(排序顏色最多花) 同乘 10 + 10240 = 5,254,400
 // 16384(每個 pixel)*32 + 64(得出每張圖的類別跟算出平均強度) + 64(排序顏色最多花) 同乘 10 + 320 = 5,244,480
-// 所以氣泡排序時間只差奇偶排序 1.00189 倍 -> 假設我要用奇偶排序法: 那麼面積就不能多出 1.00189 倍 -> 16 個比較器面積不能多出一倍
+// 所以氣泡排序時間只差奇偶排序 1.00189 倍 -> 假設我要用奇偶排序法: 那麼面積就不能多出 1.00189 倍 -> 32 個比較器面積不能多出一倍
 // 我思考了一下還是決定先試奇偶排序
 
 // SORT1
@@ -75,6 +87,7 @@ assign cmp_class_R_g_B = pixel_color_R_total > pixel_color_B_total;
 reg [4:0] pointer; // 預設先指向最後
 reg [4:0] cnt;
 reg is_sort_green; // 現在是排序藍色當中嗎? 0 為 排序藍色 1 為 排序綠色
+reg has_color_red, has_color_green, has_color_blue;
 
 // SORT2 奇偶排序
 // 比偶數 (0>1, 2>3, 4>5,...)
@@ -137,7 +150,7 @@ always @(posedge clk or posedge reset) begin
         is_sort_green <= 0;
         cnt <= 0;
         pixel_cnt <= 0;
-
+        has_color_red <= 0; has_color_green <= 0; has_color_blue <= 0;
         //div_a <= 0;
         //div_b <= 0;
         //x <= 0;
@@ -181,7 +194,7 @@ always @(posedge clk or posedge reset) begin
                         color_index_store[curr_image] <= 2'b10;
                         div_a <= B_intensity_sum << FRAC_BIT;
                         div_b <= pixel_color_B_total;
-
+                        has_color_blue <= 1'd1;
                         // 順便排序，如果 critical path 太長就拆開成下個 state -> 不要這麼做，因為其餘判斷無法判斷說到底要哪個開始索引開始移位，如果要判斷這樣太消耗面積了
                         // 改成消耗 clk 去排序
                     end
@@ -189,12 +202,13 @@ always @(posedge clk or posedge reset) begin
                         color_index_store[curr_image] <= 2'b01;
                         div_a <= G_intensity_sum << FRAC_BIT;
                         div_b <= pixel_color_G_total;
+                        has_color_green <= 1'd1;
                     end
                     5, 6, 7: begin // 紅色最大
                         color_index_store[curr_image] <= 2'b00;
                         div_a <= R_intensity_sum << FRAC_BIT;
                         div_b <= pixel_color_R_total;
-
+                        has_color_red <= 1'd1;
                         /* color_index_store[0] <= 2'b00;
                         G_pointer <= G_pointer + 1'd1;
                         B_pointer <= B_pointer + 1'd1;
@@ -236,7 +250,7 @@ always @(posedge clk or posedge reset) begin
                     //pointer <= 5'd31;
                     is_sort_green <= 1'd1;
                     if (is_sort_green == 1'd1) begin
-                        state <= SORT2;
+                        state <= SORT2_RED;
                         pointer <= 5'd31;
                     end
                 end
@@ -265,7 +279,32 @@ always @(posedge clk or posedge reset) begin
             end
 
             // 再排強度
-            SORT2: begin
+            SORT2_RED: begin // 同一組 32 個比較器要判斷 3 次 for 3 color
+                             // 顏色可能從缺，所以先判斷是否有這個顏色在電路中
+                cnt <= cnt + 1'd1;
+                if (has_color_red) begin
+                    if (cnt == 5'd31) begin
+                        cnt <= 0;
+                        state <= SORT2_GREEN;
+                    end else begin
+                        
+                    end
+                end else begin
+                    cnt <= 0;
+                    state <= SORT2_GREEN;
+                end
+            end
+            
+            SORT2_GREEN: begin // 同一組 32 個比較器要判斷 3 次 for 3 color
+            // 顏色可能從缺，所以先判斷是否有這個顏色在電路中
+
+
+                
+
+            end
+
+            SORT2_BLUE: begin // 同一組 32 個比較器要判斷 3 次 for 3 color
+            // 顏色可能從缺，所以先判斷是否有這個顏色在電路中
 
 
                 
