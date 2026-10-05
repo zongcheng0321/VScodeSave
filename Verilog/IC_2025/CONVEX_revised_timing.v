@@ -510,6 +510,35 @@ always @(posedge CLK or posedge RST) begin
                 end
             end
 
+            //----------------------------------------
+            // 這邊更好的寫法，改成 for 更簡潔且易於維護
+            /*
+            for (i = 1; i <= 11; i = i + 1) begin
+                if (i > insert_new_point_position) begin
+                    // 在插入點之後的索引：將前一個位置的資料往後推移
+                    point_sorted_x[i] <= point_sorted_x[i-1];
+                    point_sorted_y[i] <= point_sorted_y[i-1];
+                end
+                else if (i == insert_new_point_position) begin
+                    // 等於插入點的索引：寫入新資料
+                    point_sorted_x[i] <= new_x;
+                    point_sorted_y[i] <= new_y;
+                end
+                // 小於 insert_new_point_position 的索引不寫入新值，原本的暫存器會保持原值
+            end
+            */
+            
+            // 因為 point_sorted 裡面是存資料，如果改成指標去變動：
+            /*你目前的寫法最大的問題是「搬移龐大的 Data」。假設 x 和 y 各是 16-bit，你每插入一個點，就要用龐大的多工器 (MUX) 同時位移幾百個 bit 的資料。
+            這會耗費極大的邏輯閘面積與繞線資源。
+            作法：不要搬移資料（Data），改為搬移「指標（Index / Pointer）」。
+            準備一個固定大小的暫存器陣列或 SRAM 專門存 x 與 y。新進來的點，就依序存在還沒被寫入的空位（例如位址 0, 1, 2... 依序放進去），不需要排序存入。
+            另外建立一個指標陣列（Pointer Array），裡面只存 0~11 的「位址編號」（每個只需 4-bit）。
+            當你要「插入排序」時，只對這個 4-bit 的指標陣列進行位移與插入。
+            效益：
+            原本你要位移 32-bit (x+y) × 11 個位置，現在只要位移 4-bit × 11 個位置。MUX 的面積與動態功耗會瞬間縮小 80% 以上，而且維持 1 Cycle 完成插入。
+            讀取時，只要透過指標陣列去抓真實資料即可（real_x = point_data_x[ pointer_array[i] ]。*/
+            //----------------------------------------
             SORT: begin
                 // 重製訊號
                 cnt <= 0;
