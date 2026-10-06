@@ -5,8 +5,24 @@
 // y=2   [ 02 ]    [ 00 ]    [ 03 ]  <-- 殘留 03！
 // y=3   [ 02 ]    [ 00 ]    [ 02 ]  
 // y=4   [ 02 ]    [ 02 ]    [ 02 ]  
+
+//===================================
+// 此版本 ver2 改了演算法，改成當碰到兩種不同編號在九宮格內，必須合併當前九宮格編號並統一，改成較小的，利用 change_flag
+// 當整張圖掃完後，如果 change_flag == 1，座標重設回 (1,1) 再掃一次，直到整張掃完都沒有任何像素被修改，才判定 finish = 1。
+// 未來改進方向: 
+// 1. 研究 parallel two-pass CCL algorithm
+// 2. 改成 一旦碰到兩種不同編號在九宮格內，原本九宮格掃描是左上到右下，改成右下到左上 -> 意即倒回去做
+// 3. Two-Pass Raster-Scan CCL（Rosenfeld 算法變形），值得研究來利用達成此電路(在 2017 ICC DT 似乎有實作!!)
+// 4. area 可以多一點，但 time 要盡量少(成平方比關係) 
+
+// ** 關於第二點：單純「切換方向」無法保證完全收斂（遇到更複雜的形狀仍會死鎖或無限震盪）。
+// ** 硬體 FSM 與位址控制會變得極度複雜（來回震盪時的邊界與死循環問題）。
+// ** 但「正向掃一次、反向掃一次（Forward-Backward Two-Pass）」是圖像處理經典算法，只要固定方向執行，就是非常棒且可行的做法！
+/*建議總結
+    不要做「動態切換方向」，硬體很難處理 Ping-Pong 抖動和狀態記錄。
+    如果想實作「倒回去做」，請做結構化的「反向掃描 Pass」：整張圖從 (30,30) 倒序迴圈跑到 (1,1)，這樣一來無論是 U 型、倒 U 型、S 型，標籤都能完全擴散傳遞。*/
 //====================================
-// 記憶體操作及使用要參照 pdf 文件
+// 記憶體操作及使用要參照 pdf 文件(hold time violation careful)
 // 找連在一起的相同物件，由於我修過資料結構，我的第一個想法是用 DFS or BFS
 // DFS、BFS 評估：這樣還要實作記憶體 stack 或 queue，能不能把輸出的 SRAM 拿來當成可以存東西的(不多做一個記憶體耗面積)? -> 問 AI 
 // DFS、BFS 有點麻煩
@@ -24,8 +40,9 @@
 // ** 此想法發現到不能偵測物件是否有被編號過，所以此想法捨棄
 
 // 改成了先把 ROM 輸入至 SRAM，再掃描 SRAM，當掃描到物件(編號 >= 1)，生成九宮格做判斷，再把九宮格填回 SRAM
-// 原方法使用 3* 32bits * 8 bits = 7686 bits 的暫存器(不含九宮格的暫存器存資料)
+// 原方法使用 3* 32bits * 8 bits = 768 bits 的暫存器(不含九宮格的暫存器存資料)
 // 改成了只用九宮格暫存器存資料 9 * 8 bits = 72 bits
+// ** 此想法不能解決「U 型」「雙重 U 型」或「S 型」連通體
 
 `timescale 1ns/10ps
 //`include ""
@@ -39,24 +56,6 @@ output reg [9:0]  sram_a;
 output reg [7:0]  sram_d;
 output reg    sram_wen; // 當該訊號為 Low，表示 CLE 要對 SRAM 作寫入，反之，當該訊號為 High，表示 CLE 要對 SRAM 作讀取。該訊號直接與 SRAM 的控制訊號腳位 WEN 相連。
 output reg    finish;
-
-
-// ** TB 已經把我的記憶體宣告在那邊了，我不能在這邊再宣告一次
-// ROM and SRAM
-// rom_128x8 u_rom ( 
-//    .Q(rom_q), // 看 pdf 大概負緣送出資料
-//    .CLK(~clk),//** 改成了用負緣接收位置訊號，且負緣送出訊號
-//    .CEN(0),
-//    .A(rom_a)
-// );
-// sram_1024x8 u_sram (
-//    .Q(sram_q), // 看 pdf -> 寫入或讀取都是負緣前送出資料 
-//    .CLK(~clk), //** 改成了用負緣接收位置訊號，且負緣送出訊號
-//    .CEN(0),
-//    .WEN(sram_wen), // L 寫入 H 讀取
-//    .A(sram_a),
-//    .D(sram_d)
-// );
 
 //FSM
 reg [3:0] state;
@@ -81,7 +80,6 @@ assign output_addr = {y, output_x};
 //----------------------------------------
 // 九宮格
 reg [3:0] cnt; 
-// 0 的權重大於 1； 1 大於 2； 2 大於 3...
 // [0 3 6]   0:(x-1, y-1)   3:(x, y-1)   6:(x+1, y-1)
 // [1 4 7]   1:(x-1, y)     4:(x, y)     7:(x+1, y)
 // [2 5 8]   2:(x-1, y+1)   5:(x, y+1)   8:(x+1, y+1)
@@ -95,23 +93,27 @@ assign y_plus_1 = y + 1'd1;
 assign y_minus_1 = y - 1'd1;
 //----------------------------------------
 // 編號電路
+// 判斷此 pixel[i] 是沒編號的物件? 還是編號過的物件? 還是不是物件?
+wire is_object_has_num, is_object_no_num;
 wire is_object;
-assign is_object = (sram_q >= 8'd1);
-reg [7:0] num;
+assign is_object = is_object_has_num || is_object_no_num;
+assign is_object_has_num = (sram_q > 8'd1);
+assign is_object_no_num = (sram_q == 8'd1);
+
+// 在 FIND_OBJECT、INPUT_3x3_GRID 找有被編號過的最大值、最小值，並且把最大值、最小值存下來
+// 如果沒有任何一個 pixel 有標籤(num_max == 0 || num_min == 8'hff)，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 next_num
+// 如果最大最小不相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_min
+// 如果最大最小相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_max or num_min
+reg [7:0] num_min, num_max;
 reg [7:0] next_num; // 8’h01 ~ 8’hFB ，我的設計為 未編號過的物件為 h01，所以有編號過的都是從 h02 開始
-//----------------------------------------
-// 判斷是否還未編號過
-// 檢查 9 個 pixel 是否有任何一個已經編號過 (數值 > 8'd1)
-wire [8:0] is_labeled;
-assign is_labeled[0] = (pixel[0] > 8'd1);
-assign is_labeled[1] = (pixel[1] > 8'd1);
-assign is_labeled[2] = (pixel[2] > 8'd1);
-assign is_labeled[3] = (pixel[3] > 8'd1);
-assign is_labeled[4] = (pixel[4] > 8'd1);
-assign is_labeled[5] = (pixel[5] > 8'd1);
-assign is_labeled[6] = (pixel[6] > 8'd1);
-assign is_labeled[7] = (pixel[7] > 8'd1);
-assign is_labeled[8] = (pixel[8] > 8'd1);
+
+// 紀錄九個 pixel 哪個是物件 0~8 分別對應 pixel 0~8
+reg [8:0] is_object_pixel;
+
+reg is_grid_change_pixel; // 如果在 32*32 圖中發生 num_min != num_max，代表有物件相連，但前面的 pixel 沒有統一數字，所以必須整張圖重新掃描
+wire max_se_sram_q, min_ge_sram_q;
+assign max_se_sram_q = num_max <= sram_q;
+assign min_ge_sram_q = num_min >= sram_q;
 //----------------------------------------
 // 正緣觸發 clk
 always @(posedge clk or posedge reset) begin
@@ -121,91 +123,13 @@ always @(posedge clk or posedge reset) begin
         input_x <= 0; output_x <= 0; y <= 0; // 一開始先把 ROM 輸入至 SRAM
         cnt <= 0;
         next_num <= 8'd2;
+        num_max <= 0; num_min <= 8'hff; // max 設最小，min 設最大
+        is_object_pixel <= 0;
+        is_grid_change_pixel <= 0;
         // module
         finish <= 0;
-        
     end else begin
         case (state)
-            /*INPUT_ROM: begin // 此時位置已更新好，給出要資料的位置，下一個 clk 接收資料
-                cnt <= cnt + 1'd1;
-                accept_data <= 1'd1;
-
-                if (cnt == 4'd1 || cnt == 4'd3 || cnt == 4'd5 || cnt == 4'd7) begin
-                    input_x <= input_x + 1'd1;
-                end
-
-                // state 改變
-                if (accept_data) begin
-                    accept_data <= 0;
-                    case ({choose_row_to_input, cnt})
-                        // 一般情況(第四排開始)
-                        {2'd0, 4'd1}: begin
-                            row_3[7:0] <= rom_q;
-                            row_2 <= row_3;
-                            row_1 <= row_2;
-                        end
-                        {2'd0, 4'd3}: begin
-                            row_3[15:8] <= rom_q;
-                        end
-                        {2'd0, 4'd5}: begin
-                            row_3[23:16] <= rom_q;
-                        end
-                        {2'd0, 4'd7}: begin
-                            row_3[31:24] <= rom_q;
-                            cnt <= 0;
-                        end
-                        // 第一排(reset 後預設 choose_row_to_input 為 1)
-                        {2'd1, 4'd1}: begin
-                            row_1[7:0] <= rom_q;
-                        end
-                        {2'd1, 4'd3}: begin
-                            row_1[15:8] <= rom_q;
-                        end
-                        {2'd1, 4'd5}: begin
-                            row_1[23:16] <= rom_q;
-                        end
-                        {2'd1, 4'd7}: begin
-                            row_1[31:24] <= rom_q;
-                            cnt <= 0;
-                            choose_row_to_input <= 2'd2;
-                        end
-                        // 第二排(reset 後預設 choose_row_to_input 為 1)
-                        {2'd2, 4'd1}: begin
-                            row_2[7:0] <= rom_q;
-                        end
-                        {2'd3, 4'd3}: begin
-                            row_2[15:8] <= rom_q;
-                        end
-                        {2'd2, 4'd5}: begin
-                            row_2[23:16] <= rom_q;
-                        end
-                        {2'd2, 4'd7}: begin
-                            row_2[31:24] <= rom_q;
-                            cnt <= 0;
-                            choose_row_to_input <= 2'd3;
-                        end
-                        // 第三排(reset 後預設 choose_row_to_input 為 1)
-                        {2'd3, 4'd1}: begin
-                            row_3[7:0] <= rom_q;
-                        end
-                        {2'd3, 4'd3}: begin
-                            row_3[15:8] <= rom_q;
-                        end
-                        {2'd3, 4'd5}: begin
-                            row_3[23:16] <= rom_q;
-                        end
-                        {2'd3, 4'd7}: begin
-                            row_3[31:24] <= rom_q;
-                            cnt <= 0;
-                            choose_row_to_input <= 0;
-                            state <= CALC;
-                        end
-                        
-                        default: ;
-                    endcase
-                end
-            end*/
-
             INPUT_ROM: begin // 此 clk 的負緣輸入 input_addr，所以下個 正緣 clk 可以直接取到在此 負緣 clk 給的位置
                 // 在此位置輸入 (0,0) -> 輸出 X軸=00, Y軸=00 ~ 07 的 pixel，下個 clk 可取值
                 state <= STORE_SRAM; // 下個 state 準備寫入 SRAM
@@ -218,7 +142,6 @@ always @(posedge clk or posedge reset) begin
                 // 就不會 Hold Time violation
                 cnt <= cnt + 1'd1;
                 output_x <= output_x + 1'd1;
-                
                 if (cnt == 4'd7) begin
                     // 因為 ROM 是接收到位置，下一個 clk 才會輸出 data，在第 8 個 clk 他收到了位置
                     // 此時他的輸出還在前一個，第 9 個 clk 他就會輸出 input_x + 1'd1 的值了
@@ -237,15 +160,30 @@ always @(posedge clk or posedge reset) begin
             end
 
             READ_SRAM: begin // 此 clk 負緣給出 READ 模式及 READ_addr，所以下一個正緣(FIND_OBJECT)就可以讀到資料了
+                // negedge clk 給出 pixel [4] 的位置
                 state <= FIND_OBJECT;
             end
 
             // 從 (1,1) 掃到 (30,30)，找出物件(>= 1)，此外現在已經是 read 模式(在負緣 clk 改變的)
-            FIND_OBJECT: begin
-                if (is_object) begin // negedge clk 給出位置
+            FIND_OBJECT: begin // negedge clk 給出 pixel [0] 的位置
+                if (is_object) begin 
                     // 找到物件，先存入中心點資料，且 state 跳轉到 INPUT_3x3_GRID
                     pixel[4] <= sram_q; // 中心點 (x, y)
+                    is_object_pixel[4] <= 1'd1;
+                    if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                        // 在 FIND_OBJECT、INPUT_3x3_GRID 找有被編號過的最大值、最小值，並且把最大值、最小值存下來
+                        // 如果沒有任何一個 pixel 有標籤(num_max == 0 || num_min == 8'hff)，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 next_num
+                        // 如果最大最小不相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_min
+                        // 如果最大最小相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_max or num_min
+                        if (max_se_sram_q) begin
+                            num_max <= sram_q; 
+                        end
+                        if (min_ge_sram_q) begin
+                            num_min <= sram_q; 
+                        end
+                    end
                     state <= INPUT_3x3_GRID; // 跳轉到輸入九宮格狀態
+
                 end else begin
                     // 若當前中心點不是物件，移動至下一個座標
                     state <= UPDATE_X_Y;
@@ -258,11 +196,18 @@ always @(posedge clk or posedge reset) begin
                 if (output_x == 5'd30) begin
                     output_x <= 5'd1;
                     y <= y + 1'd1;
-                    if (y == 5'd30) begin
-                        finish <= 1'd1; // 掃描完 (1,1) ~ (30,30) 結束
+                    if (y == 5'd30) begin // 掃描完 (1,1) ~ (30,30) 結束
+                        if (is_grid_change_pixel) begin // 如果出現相連物件編號錯誤，那就整張圖重跑，直到沒有編號錯誤為止
+                            state <= READ_SRAM;
+                            is_grid_change_pixel <= 0;
+                            // 把等等要掃描 SRAM 的 x y 重製成 (1,1) 開始
+                            output_x <= 1'd1;
+                            y <= 1'd1;
+                        end else begin
+                            finish <= 1'd1; 
+                        end
                     end
                 end
-
                 state <= READ_SRAM;
             end
 
@@ -271,58 +216,156 @@ always @(posedge clk or posedge reset) begin
                 cnt <= cnt + 1'd1;
                 // 負緣位址會提前給出，正緣依序把 SRAM 資料抓入九宮格 pixel 陣列
                 case (cnt)
-                    0: pixel[0] <= sram_q; // 左上 (x-1, y-1)
-                    1: pixel[1] <= sram_q; // 左中 (x-1, y)
-                    2: pixel[2] <= sram_q; // 左下 (x-1, y+1)
-                    3: pixel[3] <= sram_q; // 中上 (x, y-1)
-                    4: pixel[5] <= sram_q; // 中下 (x, y+1)
-                    5: pixel[6] <= sram_q; // 右上 (x+1, y-1)
-                    6: pixel[7] <= sram_q; // 右中 (x+1, y)
+                    0: begin
+                        pixel[0] <= sram_q; // 左上 (x-1, y-1)
+                        if (is_object) is_object_pixel[0] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            // 在 FIND_OBJECT、INPUT_3x3_GRID 找有被編號過的最大值、最小值，並且把最大值、最小值存下來
+                            // 如果沒有任何一個 pixel 有標籤(num_max == 0 || num_min == 8'hff)，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 next_num
+                            // 如果最大最小不相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_min
+                            // 如果最大最小相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_max or num_min
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
+                    1: begin
+                        pixel[1] <= sram_q; // 左中 (x-1, y)
+                        if (is_object) is_object_pixel[1] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
+                    2: begin
+                        pixel[2] <= sram_q; // 左下 (x-1, y+1)
+                        if (is_object) is_object_pixel[2] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
+                    3: begin
+                        pixel[3] <= sram_q; // 中上 (x, y-1)
+                        if (is_object) is_object_pixel[3] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
+                    4: begin
+                        pixel[5] <= sram_q; // 中下 (x, y+1)
+                        if (is_object) is_object_pixel[5] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
+                    5: begin
+                        pixel[6] <= sram_q; // 右上 (x+1, y-1)
+                        if (is_object) is_object_pixel[6] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
+                    6: begin
+                        pixel[7] <= sram_q; // 右中 (x+1, y)
+                        if (is_object) is_object_pixel[7] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                    end
                     7: begin
                         pixel[8] <= sram_q;// 右下 (x+1, y+1)
-                        cnt <= 0;
-                        state <= CALC;     // 抓完 8 個鄰居，進入運算狀態
+                        if (is_object) is_object_pixel[8] <= 1'd1;
+                        if (is_object_has_num) begin // 如果物件有被編號過 (pixel > 1)
+                            if (max_se_sram_q) begin
+                                num_max <= sram_q; 
+                            end
+                            if (min_ge_sram_q) begin
+                                num_min <= sram_q; 
+                            end
+                        end
+                        cnt <= 0; // reset
+                        state <= CALC;
                     end
                     default: ;
                 endcase
             end
 
             CALC: begin
-                // 判斷 pixel 是否有被編號過，如果有被編號過(h01以外的值)，就依照權重把所有 pixel 全部改為那個 num
-                // 如果沒有被編號過(h01)，就全部 pixel 全部改成 next_num
+                // 如果沒有任何一個 pixel 有標籤(num_max == 0 || num_min == 8'hff)，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 next_num
+                // 如果最大最小不相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_min
+                // 如果最大最小相等，就把 (pixel[i] >= 1) 的所有 pixel 全部改為 num_max or num_min
+                if (num_min == 8'hff) begin 
+                    // 九宮格內都是沒有編號過的物件，給新編號
+                    pixel[0] <= (is_object_pixel[0]) ? next_num : 0;
+                    pixel[1] <= (is_object_pixel[1]) ? next_num : 0;
+                    pixel[2] <= (is_object_pixel[2]) ? next_num : 0;
+                    pixel[3] <= (is_object_pixel[3]) ? next_num : 0;
+                    pixel[4] <= (is_object_pixel[4]) ? next_num : 0;
+                    pixel[5] <= (is_object_pixel[5]) ? next_num : 0;
+                    pixel[6] <= (is_object_pixel[6]) ? next_num : 0;
+                    pixel[7] <= (is_object_pixel[7]) ? next_num : 0;
+                    pixel[8] <= (is_object_pixel[8]) ? next_num : 0;
+                    next_num <= next_num + 1'd1;
+                end else if (num_min != num_max) begin
+                    // 九宮格有物件編號不一樣
+                    is_grid_change_pixel <= 1'd1;
+                    pixel[0] <= (is_object_pixel[0]) ? num_min : 0;
+                    pixel[1] <= (is_object_pixel[1]) ? num_min : 0;
+                    pixel[2] <= (is_object_pixel[2]) ? num_min : 0;
+                    pixel[3] <= (is_object_pixel[3]) ? num_min : 0;
+                    pixel[4] <= (is_object_pixel[4]) ? num_min : 0;
+                    pixel[5] <= (is_object_pixel[5]) ? num_min : 0;
+                    pixel[6] <= (is_object_pixel[6]) ? num_min : 0;
+                    pixel[7] <= (is_object_pixel[7]) ? num_min : 0;
+                    pixel[8] <= (is_object_pixel[8]) ? num_min : 0;
+                end else begin
+                    // 九宮格編號沒有衝突
+                    pixel[0] <= (is_object_pixel[0]) ? num_min : 0;
+                    pixel[1] <= (is_object_pixel[1]) ? num_min : 0;
+                    pixel[2] <= (is_object_pixel[2]) ? num_min : 0;
+                    pixel[3] <= (is_object_pixel[3]) ? num_min : 0;
+                    pixel[4] <= (is_object_pixel[4]) ? num_min : 0;
+                    pixel[5] <= (is_object_pixel[5]) ? num_min : 0;
+                    pixel[6] <= (is_object_pixel[6]) ? num_min : 0;
+                    pixel[7] <= (is_object_pixel[7]) ? num_min : 0;
+                    pixel[8] <= (is_object_pixel[8]) ? num_min : 0;
+                end
 
-                cnt <= cnt + 1'd1;
-                if (cnt <= 4'd8) begin
-                    if (is_labeled[8 - cnt]) begin
-                        num <= pixel[8 - cnt];
-                    end
-                end
-                if (cnt == 4'd9) begin
-                    cnt <= 0;
-                    if (|is_labeled) begin // 如果其中一個為有編號過的，那就只要 pixel 不等於 0 就填為 num
-                        pixel[0] <= (pixel[0] != 0) ? num : 0;
-                        pixel[1] <= (pixel[1] != 0) ? num : 0;
-                        pixel[2] <= (pixel[2] != 0) ? num : 0;
-                        pixel[3] <= (pixel[3] != 0) ? num : 0;
-                        pixel[4] <= (pixel[4] != 0) ? num : 0;
-                        pixel[5] <= (pixel[5] != 0) ? num : 0;
-                        pixel[6] <= (pixel[6] != 0) ? num : 0;
-                        pixel[7] <= (pixel[7] != 0) ? num : 0;
-                        pixel[8] <= (pixel[8] != 0) ? num : 0;
-                    end else begin
-                        pixel[0] <= (pixel[0] != 0) ? next_num : 0;
-                        pixel[1] <= (pixel[1] != 0) ? next_num : 0;
-                        pixel[2] <= (pixel[2] != 0) ? next_num : 0;
-                        pixel[3] <= (pixel[3] != 0) ? next_num : 0;
-                        pixel[4] <= (pixel[4] != 0) ? next_num : 0;
-                        pixel[5] <= (pixel[5] != 0) ? next_num : 0;
-                        pixel[6] <= (pixel[6] != 0) ? next_num : 0;
-                        pixel[7] <= (pixel[7] != 0) ? next_num : 0;
-                        pixel[8] <= (pixel[8] != 0) ? next_num : 0;
-                        next_num <= next_num + 1'd1;
-                    end
-                    state <= OUTPUT_3x3_GRID;
-                end
+                num_max <= 0; num_min <= 8'hff; // max 設最小，min 設最大
+                is_object_pixel <= 0;
+                state <= OUTPUT_3x3_GRID;
             end
 
             OUTPUT_3x3_GRID: begin
